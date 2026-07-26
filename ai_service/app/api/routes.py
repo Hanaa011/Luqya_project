@@ -1,5 +1,7 @@
 import json
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
 from app.models.schemas import ItemData, MatchRequest, MatchResponse
 from app.services.chat_service import extract_item_from_message
 from app.services.image_service import analyze_item_image
@@ -25,10 +27,22 @@ async def match_image(
 
     image_bytes = await image.read()
 
-    image_data = analyze_item_image(
-        image_bytes=image_bytes,
-        mime_type=image.content_type
-    )
+    if not image_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded image is empty."
+        )
+
+    try:
+        image_data = analyze_item_image(
+            image_bytes=image_bytes,
+            mime_type=image.content_type
+        )
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to analyze the uploaded image."
+        ) from exc
 
     lost_item = ItemData(
         type=image_data.get("type") or "unknown",
@@ -44,15 +58,33 @@ async def match_image(
             detail="found_items_json must contain valid JSON."
         ) from exc
 
-    found_items = [
-        ItemData(**item)
-        for item in found_items_data
-    ]
+    if not isinstance(found_items_data, list):
+        raise HTTPException(
+            status_code=400,
+            detail="found_items_json must contain a JSON array."
+        )
 
-    matches = find_matches(
-        lost_item=lost_item,
-        found_items=found_items
-    )
+    try:
+        found_items = [
+            ItemData(**item)
+            for item in found_items_data
+        ]
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="One or more found items contain invalid data."
+        ) from exc
+
+    try:
+        matches = find_matches(
+            lost_item=lost_item,
+            found_items=found_items
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to calculate item matches."
+        ) from exc
 
     best_match = matches[0] if matches else None
 
@@ -76,11 +108,16 @@ async def match_image(
     response_model=MatchResponse
 )
 def match_items(request: MatchRequest):
-
-    matches = find_matches(
-        lost_item=request.lost_item,
-        found_items=request.found_items
-    )
+    try:
+        matches = find_matches(
+            lost_item=request.lost_item,
+            found_items=request.found_items
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to calculate item matches."
+        ) from exc
 
     return MatchResponse(
         matches=matches
@@ -89,17 +126,30 @@ def match_items(request: MatchRequest):
 
 @router.post("/chat-search")
 async def chat_search(request: dict):
-
     message = request.get("message")
     found_items_data = request.get("found_items", [])
 
-    if not message:
+    if not isinstance(message, str) or not message.strip():
         raise HTTPException(
             status_code=400,
             detail="Message is required."
         )
 
-    extracted_data = extract_item_from_message(message)
+    if not isinstance(found_items_data, list):
+        raise HTTPException(
+            status_code=400,
+            detail="found_items must contain a JSON array."
+        )
+
+    try:
+        extracted_data = extract_item_from_message(
+            message.strip()
+        )
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to extract item information from the message."
+        ) from exc
 
     lost_item = ItemData(
         type=extracted_data.get("type") or "unknown",
@@ -108,15 +158,27 @@ async def chat_search(request: dict):
         location_name=extracted_data.get("location")
     )
 
-    found_items = [
-        ItemData(**item)
-        for item in found_items_data
-    ]
+    try:
+        found_items = [
+            ItemData(**item)
+            for item in found_items_data
+        ]
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="One or more found items contain invalid data."
+        ) from exc
 
-    matches = find_matches(
-        lost_item=lost_item,
-        found_items=found_items
-    )
+    try:
+        matches = find_matches(
+            lost_item=lost_item,
+            found_items=found_items
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to calculate item matches."
+        ) from exc
 
     best_match = matches[0] if matches else None
 

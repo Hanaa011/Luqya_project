@@ -5,8 +5,11 @@ from app.api.routes import router as ai_router
 
 app = FastAPI(
     title="Luqya AI Service",
-    description="AI service for lost and found item matching",
+    description="AI service for lost and found item matching using OpenAI and semantic search.",
     version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
 
@@ -17,7 +20,9 @@ app.include_router(ai_router)
 def root():
     return {
         "service": "Luqya AI Service",
-        "status": "running"
+        "version": app.version,
+        "status": "running",
+        "docs": "/docs"
     }
 
 

@@ -33,9 +33,13 @@ def analyze_item_image(
                     {
                         "type": "input_text",
                         "text": """
-Analyze this lost-and-found item image.
+You are an expert AI system for airport lost and found.
 
-Return ONLY valid JSON with these fields:
+Analyze the uploaded image and extract information about the visible item.
+
+Return ONLY valid JSON.
+
+Schema:
 
 {
   "type": "",
@@ -44,10 +48,90 @@ Return ONLY valid JSON with these fields:
 }
 
 Rules:
-- Describe only visible characteristics.
-- Include any visible brand or distinguishing details inside the description.
-- Do not invent information.
-- Use concise English values.
+
+- Describe only information that is clearly visible.
+- Never guess or infer hidden details.
+- Use concise English.
+- Standardize the item type.
+
+Possible item types include:
+
+Bag
+Backpack
+Handbag
+Wallet
+Phone
+Laptop
+Tablet
+Watch
+Keys
+Passport
+ID Card
+Earphones
+Glasses
+Bottle
+Clothing
+Jewelry
+Luggage
+
+Description must include every visible identifying characteristic such as:
+
+- Brand
+- Model
+- Material
+- Shape
+- Pattern
+- Size
+- Logos
+- Stickers
+- Scratches
+- Damage
+- Accessories
+- Attached objects
+- Distinctive marks
+- Printed text
+- Visible numbers
+- Unique appearance
+
+For color:
+
+- Return only the primary color.
+- If multiple colors exist, keep secondary colors inside description.
+
+Examples:
+
+Image:
+Black leather handbag with a gold chain.
+
+Output:
+
+{
+  "type":"bag",
+  "description":"black leather handbag with gold chain",
+  "color":"black"
+}
+
+Image:
+Silver HP laptop with a cracked top cover and university sticker.
+
+Output:
+
+{
+  "type":"laptop",
+  "description":"silver HP laptop with cracked top cover and university sticker",
+  "color":"silver"
+}
+
+Image:
+Blue Adidas backpack with white stripes.
+
+Output:
+
+{
+  "type":"bag",
+  "description":"blue Adidas backpack with white stripes",
+  "color":"blue"
+}
 """
                     },
                     {
@@ -62,5 +146,10 @@ Rules:
     )
 
     text = response.output_text.strip()
+
+    if not text:
+        raise ValueError(
+            "AI returned an empty response."
+        )
 
     return json.loads(text)

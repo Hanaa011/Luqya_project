@@ -11,13 +11,35 @@ client = OpenAI(
 )
 
 
-def get_embeddings(texts: list[str]) -> list[list[float]]:
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=texts
+def prepare_text(text: str) -> str:
+    return " ".join(
+        str(text).strip().split()
     )
 
+
+def get_embeddings(
+    texts: list[str]
+) -> list[list[float]]:
+
+    if not texts:
+        return []
+
+    cleaned_texts = [
+        prepare_text(text)
+        for text in texts
+    ]
+
+    response = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=cleaned_texts
+    )
+
+    if len(response.data) != len(cleaned_texts):
+        raise ValueError(
+            "Embedding response size mismatch."
+        )
+
     return [
-        item.embedding
-        for item in response.data
+        embedding.embedding
+        for embedding in response.data
     ]
