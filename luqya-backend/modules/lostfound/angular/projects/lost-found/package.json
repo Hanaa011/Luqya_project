@@ -1,0 +1,12 @@
+{
+  "name": "@lost-found",
+  "version": "0.0.1",
+  "dependencies": {
+    "@abp/ng.core": "~10.4.1",
+    "@abp/ng.oauth": "~10.4.1",
+    "@abp/ng.theme.shared": "~10.4.1",
+    "@abp/ng.components":"~10.4.1",
+    "@volo/abp.commercial.ng.ui": "~10.4.1",
+    "tslib": "^2.1.0"
+  }
+}
