@@ -1,35 +1,44 @@
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel
+
+from pydantic import BaseModel, Field
 
 
 class ItemData(BaseModel):
-    report_id: Optional[int] = None
-    reporter_id: Optional[int] = None
-    location_id: Optional[int] = None
-    type: str
-    description: str
-    color: Optional[str] = None
-    lost_found_date: Optional[datetime] = None
-    image_path: Optional[str] = None
-    is_item_with_finder: Optional[bool] = None
-    pickup_location: Optional[str] = None
-    status: Optional[str] = None
-    location_name: Optional[str] = None
+    report_id: str | None = None
+    reporter_id: str | None = None
+    location_id: str | None = None
+
+    type: str | None = None
+    description: str | None = None
+    color: str | None = None
+
+    lost_found_date: datetime | None = None
+    image_path: str | None = None
+    is_item_with_finder: bool | None = None
+    pickup_location: str | None = None
+    status: str | None = None
+    location_name: str | None = None
 
 
 class MatchRequest(BaseModel):
     lost_item: ItemData
-    found_items: List[ItemData]
+    found_items: list[ItemData] = Field(
+        default_factory=list
+    )
 
 
 class MatchResult(BaseModel):
-    lost_report_id: Optional[int] = None
-    found_report_id: int
-    similarity_score: float
+    lost_report_id: str | None = None
+    found_report_id: str | None = None
+    similarity_score: float = Field(
+        ge=0,
+        le=100,
+    )
     match_reason: str
     status: str
 
 
 class MatchResponse(BaseModel):
-    matches: List[MatchResult]
+    matches: list[MatchResult] = Field(
+        default_factory=list
+    )
