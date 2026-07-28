@@ -1,0 +1,426 @@
+@import url("https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  Tokens below mirror لقيا's official visual identity guide 1.0 (Jul 2026)
+  exactly: the teal/coral palette, Almarai + IBM Plex Sans Arabic pairing,
+  and a border-first shadow philosophy rather than heavy glows. Coral is
+  the guide's 10%-maximum "match" color — reserved for confirmation
+  moments (This is mine, found notifications, >90% match bars) — so it is
+  intentionally used sparingly across the app, not as a general accent.
+*/
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-stone-50: var(--stone-50);
+  --color-stone-100: var(--stone-100);
+  --color-stone-200: var(--stone-200);
+
+  --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
+  --color-warn: var(--warn);
+  --color-warn-tint: var(--warn-tint);
+  --color-error: var(--error);
+  --color-error-tint: var(--error-tint);
+
+  --font-display: "Almarai", sans-serif;
+  --font-body: "Manrope", sans-serif;
+  --font-arabic: "IBM Plex Sans Arabic", sans-serif;
+  --font-urdu: "Noto Nastaliq Urdu", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --shadow-luxe: var(--shadow-luxe-value);
+  --shadow-soft: var(--shadow-soft-value);
+  --shadow-glow: var(--shadow-glow-value);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  --background: #fafcfb;
+  --foreground: #17211f;
+
+  --muted: #e3f2ef;
+  --muted-foreground: #61706c;
+
+  --card: #ffffff;
+  --card-foreground: #17211f;
+
+  --primary: #0d7a6f;
+  --primary-dark: #0a5f57;
+  --primary-bright: #12968a;
+  --primary-foreground: #ffffff;
+
+  --accent: #f0703a;
+  --accent-dark: #d6551f;
+  --accent-tint: #fdebe2;
+  --accent-foreground: #ffffff;
+
+  --ink: #101d1b;
+
+  --success: #158a5a;
+  --success-tint: #e2f3ec;
+  --warn: #b45309;
+  --warn-tint: #fcf0dd;
+  --error: #c43d4b;
+  --error-tint: #fbe9eb;
+
+  --border: #e5ecea;
+  --input: #e5ecea;
+  --ring: #0d7a6f;
+
+  --stone-50: #f0f7f5;
+  --stone-100: #e3f2ef;
+  --stone-200: #e5ecea;
+
+  --shadow-luxe-value:
+    0 24px 48px -24px rgba(13, 122, 111, 0.16),
+    0 2px 8px -2px rgba(16, 29, 27, 0.06);
+
+  --shadow-soft-value:
+    0 1px 3px rgba(16, 29, 27, 0.06),
+    0 1px 2px rgba(16, 29, 27, 0.04);
+
+  --shadow-glow-value:
+    0 0 0 1px rgba(13, 122, 111, 0.12),
+    0 12px 32px -14px rgba(13, 122, 111, 0.24);
+}
+
+/* Dark mode follows the guide's own note that the logo's waves turn
+   frosted/misty at night — reuses the guide's brighter "teal-bright" as
+   the primary so it still reads clearly on a near-black ink background,
+   with coral untouched since it stays a rare, deliberate accent. */
+.dark {
+  --background: #101d1b;
+  --foreground: #f0f7f5;
+
+  --muted: #17211f;
+  --muted-foreground: #9aa6a3;
+
+  --card: #17211f;
+  --card-foreground: #f0f7f5;
+
+  --primary: #12968a;
+  --primary-dark: #0d7a6f;
+  --primary-bright: #2fc2b3;
+  --primary-foreground: #04140d;
+
+  --accent: #f0703a;
+  --accent-dark: #ffa276;
+  --accent-tint: rgba(240, 112, 58, 0.16);
+  --accent-foreground: #1a1004;
+
+  --success: #2fbb85;
+  --success-tint: rgba(21, 138, 90, 0.18);
+  --warn: #e2a355;
+  --warn-tint: rgba(180, 83, 9, 0.2);
+  --error: #e8707b;
+  --error-tint: rgba(196, 61, 75, 0.2);
+
+  --border: rgba(240, 247, 245, 0.1);
+  --input: rgba(240, 247, 245, 0.14);
+  --ring: #12968a;
+
+  --stone-50: #17211f;
+  --stone-100: #1c2622;
+  --stone-200: rgba(240, 247, 245, 0.12);
+
+  --shadow-luxe-value:
+    0 0 50px -14px rgba(18, 150, 138, 0.28),
+    0 30px 70px -28px rgba(0, 0, 0, 0.6);
+
+  --shadow-soft-value:
+    0 10px 28px -16px rgba(0, 0, 0, 0.5);
+
+  --shadow-glow-value:
+    0 0 0 1px rgba(18, 150, 138, 0.18),
+    0 0 36px -6px rgba(18, 150, 138, 0.38);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    transition: background-color 0.4s var(--ease-out-expo), color 0.4s var(--ease-out-expo);
+  }
+
+  html[data-locale="ar"] body {
+    font-family: var(--font-arabic);
+  }
+
+  html[data-locale="ur"] body {
+    font-family: var(--font-urdu);
+    line-height: 1.95;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  .font-display {
+    font-family: var(--font-display) !important;
+  }
+
+  .font-arabic {
+    font-family: var(--font-arabic) !important;
+  }
+
+  .font-urdu {
+    font-family: var(--font-urdu) !important;
+    line-height: 1.95;
+  }
+
+  .font-mono {
+    font-family: var(--font-mono) !important;
+  }
+
+  ::selection {
+    background: var(--primary);
+    color: white;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-18px) rotate(2deg);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(10px, -14px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes ping-slow {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-float {
+  animation: float 6s var(--ease-out-expo) infinite;
+}
+
+@utility animate-drift {
+  animation: drift 10s ease-in-out infinite;
+}
+
+@utility animate-ping-slow {
+  animation: ping-slow 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@utility animate-fade-up {
+  animation: fade-up 0.8s var(--ease-out-expo) both;
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility text-pretty {
+  text-wrap: pretty;
+}
+
+/* Ambient backgrounds now echo the logo's own metaphor — a warm coral
+   glow (the lantern) resting inside a much larger teal field (the AI
+   signal) — instead of the previous emerald/gold combination. */
+@utility bg-aurora {
+  background-image:
+    radial-gradient(
+      at 20% 10%,
+      rgba(13, 122, 111, 0.1) 0,
+      transparent 45%
+    ),
+    radial-gradient(
+      at 85% 20%,
+      rgba(240, 112, 58, 0.08) 0,
+      transparent 40%
+    ),
+    radial-gradient(
+      at 50% 90%,
+      rgba(13, 122, 111, 0.08) 0,
+      transparent 50%
+    );
+}
+
+@utility bg-aurora-ink {
+  background-image:
+    radial-gradient(
+      at 20% 10%,
+      rgba(18, 150, 138, 0.2) 0,
+      transparent 45%
+    ),
+    radial-gradient(
+      at 85% 20%,
+      rgba(240, 112, 58, 0.12) 0,
+      transparent 40%
+    ),
+    radial-gradient(
+      at 50% 90%,
+      rgba(18, 150, 138, 0.14) 0,
+      transparent 50%
+    );
+}
+
+.dark .bg-aurora {
+  background-image:
+    radial-gradient(
+      at 20% 10%,
+      rgba(18, 150, 138, 0.18) 0,
+      transparent 45%
+    ),
+    radial-gradient(
+      at 85% 20%,
+      rgba(240, 112, 58, 0.1) 0,
+      transparent 40%
+    ),
+    radial-gradient(
+      at 50% 90%,
+      rgba(18, 150, 138, 0.12) 0,
+      transparent 50%
+    );
+}
+
+@utility bg-dots {
+  background-image: radial-gradient(currentColor 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@keyframes damma-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes wave-ripple {
+  0% { transform: scale(0.85); opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes lantern-glow {
+  0%, 100% { opacity: 0.7; filter: blur(8px); }
+  50% { opacity: 1; filter: blur(11px); }
+}
+
+@utility animate-damma-spin {
+  animation: damma-spin 2.2s linear infinite;
+}
+
+@utility animate-scan-line {
+  animation: scan-line 2.4s var(--ease-out-expo) infinite;
+}
+
+@utility animate-glow-pulse {
+  animation: glow-pulse 2.6s ease-in-out infinite;
+}
+
+@utility animate-rise-in {
+  animation: rise-in 0.6s var(--ease-out-expo) both;
+}
+
+@utility animate-wave-ripple {
+  animation: wave-ripple 3s var(--ease-out-expo) infinite;
+}
+
+@keyframes sheen {
+  0%,
+  100% {
+    transform: translateX(-140%);
+  }
+
+  50% {
+    transform: translateX(220%);
+  }
+}
+
+@utility animate-sheen {
+  animation: sheen 9s var(--ease-out-expo) infinite;
+}
+
+@utility animate-lantern-glow {
+  animation: lantern-glow 3.4s ease-in-out infinite;
+}

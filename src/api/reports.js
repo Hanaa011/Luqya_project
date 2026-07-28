@@ -1,0 +1,81 @@
+import { api } from "./httpClient";
+
+// ReportAppService.GetListAsync(GetReportListDto) -> GET api/app/report -> PagedResultDto<ReportDto>
+// NOTE: GetReportListDto has no CreatorId property, and GetListAsync's
+// .WhereIf(...) chain never filters by creator — there is no server-side
+// "my reports" filter today. Do not pass a creatorId param here; it would
+// be silently ignored, which is exactly what caused the account-data-
+// leak bug (see lib/myReports.js for the verified root cause and the
+// client-side filtering workaround that actually works).
+export function listReports({ filter, type, status, locationId, reporterId, categoryId, sorting, skipCount, maxResultCount } = {}, signal) {
+  return api.get(
+    "/api/app/report",
+    { filter, type, status, locationId, reporterId, categoryId, sorting, skipCount, maxResultCount },
+    signal
+  );
+}
+
+// ForgeService.ReportGETAsync(id) -> GET api/app/report/{id} -> ReportDto
+export function getReport(id, signal) {
+  return api.get(`/api/app/report/${id}`, undefined, signal);
+}
+
+// ForgeService.ReportPOSTAsync(CreateReportDto) -> POST api/app/report -> ReportDto
+// Verified against LostFound.Application.Contracts/Reports/Dtos/CreateReportDto.cs —
+// reporterName/reporterPhone/reporterEmail/preferredContact are real,
+// current fields (ignored server-side for authenticated users, required
+// — phone specifically — for guests).
+export function createReport({
+  locationId,
+  locationDetails,
+  type,
+  description,
+  lostFoundDate,
+  imagePath,
+  isItemWithFinder,
+  pickupLocation,
+  reporterName,
+  reporterPhone,
+  reporterEmail,
+  preferredContact,
+}) {
+  return api.post("/api/app/report", {
+    locationId,
+    locationDetails,
+    type,
+    description,
+    lostFoundDate,
+    imagePath,
+    isItemWithFinder,
+    pickupLocation,
+    reporterName,
+    reporterPhone,
+    reporterEmail,
+    preferredContact,
+  });
+}
+
+// ForgeService.ReportPUTAsync(id, UpdateReportDto) -> PUT api/app/report/{id} -> ReportDto
+export function updateReport(id, patch) {
+  return api.put(`/api/app/report/${id}`, patch);
+}
+
+// ForgeService.ReportDELETEAsync(id) -> DELETE api/app/report/{id}
+export function deleteReport(id) {
+  return api.del(`/api/app/report/${id}`);
+}
+
+// ForgeService.ReportAnalyticsAsync(topN?) -> GET api/app/report-analytics -> ReportAnalyticsDto
+export function getReportAnalytics(topN, signal) {
+  return api.get("/api/app/report-analytics", { topN }, signal);
+}
+
+/**
+ * There is no verified file/image upload endpoint on this backend.
+ * `imagePath` is only ever sent when it's already a real hosted URL —
+ * which never happens today, so report creation simply omits it. Photos
+ * stay local-preview-only until an upload endpoint exists; do not invent
+ * one and do not send base64 data through this string field (unlike
+ * AiSearchInputDto.ImageBase64, which is verified to accept base64 —
+ * see api/search.js).
+ */
