@@ -1,33 +1,25 @@
 import { listReports } from "../api/reports";
 
 /**
- * IMPORTANT — corrected after a live bug report (see conversation history):
- * `creatorId` is NOT a real server-side filter on GET /api/app/report.
- * Verified directly against the current backend source:
- *   - GetReportListDto.cs only declares Filter/Type/Status/LocationId/
- *     ReporterId/CategoryId — there is no CreatorId property at all.
- *   - ReportAppService.GetListAsync's `.WhereIf(...)` chain never
- *     references CreatorId.
- * So passing `creatorId` as a query param was always a silent no-op —
- * the server ignored it and returned the same *global, unfiltered* page
- * to every caller regardless of who was logged in. That's what caused
- * "Smart Search returns nothing when logged in" (this function's result
- * set was actually every report in the system, not just the user's own,
- * so Smart Search's own-report exclusion filtered out everything) and
- * "Account B sees Account A's reports" (Dashboard/Browse were reading
- * the same unfiltered global list for every account).
+ * Ownership source of truth: Report.CreatorId, the ABP audit field
+ * populated automatically at creation time by whichever IdentityUser was
+ * authenticated. Confirmed fixed on the backend (ReportAppService.MapToDto
+ * now actually copies CreatorId onto the DTO — it previously omitted it,
+ * which is why this was temporarily switched to ReporterId).
  *
- * `ReportDto` DOES include a real `creatorId` on every item (inherited
- * from ABP's `AuditedEntityDto<Guid>`, populated automatically at
- * creation time) — so real per-user filtering is only possible
- * client-side, by fetching a page and keeping the rows whose own
- * `creatorId` matches the current user.
+ * ReporterId is NOT used for ownership anymore — it remains purely a
+ * contact/reporter-record concept (see lib/reporterFields.js / report
+ * creation), not an account-isolation mechanism.
  *
- * Known limitation (frontend cannot fix this without backend support):
- * this only sees whatever it fetches. Once total report volume exceeds
- * `maxResultCount`, this will silently miss a user's older reports. A
- * real `CreatorId` filter parameter on GetReportListDto is the correct
- * long-term fix and would need a backend change.
+ * Known limitation, unchanged from before ReporterId was ever introduced:
+ * GetReportListDto has no CreatorId query parameter (verified against the
+ * actual backend source — ReportAppService.GetListAsync's .WhereIf chain
+ * never references CreatorId), so there is still no real server-side
+ * filter for "my reports" by creator. This fetches a page and filters
+ * client-side by the report's own creatorId field instead. That means a
+ * user's reports beyond `maxResultCount` in the global feed won't appear
+ * here without a real backend filter — a real, deliberate trade-off
+ * accepted by reverting to CreatorId, not something new.
  */
 export async function fetchMyReports({ userId, maxResultCount = 500, sorting = "creationTime desc", signal } = {}) {
   if (!userId) {

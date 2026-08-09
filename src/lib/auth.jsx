@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import * as authApi from "../api/auth";
 import { onUnauthorized, ApiError } from "../api/httpClient";
-import { getToken } from "../api/tokenStore";
+import { getToken, clearToken } from "../api/tokenStore";
+import { clearKnownReporterId } from "../api/reporterIdentity";
 import { getUserIdFromToken } from "./jwt";
 import { AuthContext } from "./authContext";
 
@@ -18,6 +19,14 @@ export function AuthProvider({ children }) {
       return data;
     } catch (err) {
       if (err instanceof ApiError && err.isUnauthorized) {
+        // The token itself is invalid/expired at the server — not just a
+        // UI-state thing. If we only clear React state here and leave the
+        // token sitting in storage, httpClient keeps attaching it to
+        // every subsequent request (including a "guest" report
+        // submission the UI now shows), and the backend authenticates
+        // that request as the old account. Clear the actual token too.
+        clearToken();
+        clearKnownReporterId();
         setProfile(null);
         setUserId(null);
         return null;
@@ -50,6 +59,12 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     return onUnauthorized(() => {
+      // Same reasoning as above: a 401 from ANY endpoint means the
+      // server no longer considers this token valid, so it must not be
+      // sent again — otherwise the app can show "logged out" while
+      // still authenticating requests as the previous account.
+      clearToken();
+      clearKnownReporterId();
       setProfile(null);
       setUserId(null);
     });
@@ -64,14 +79,34 @@ export function AuthProvider({ children }) {
     return authApi.register(payload);
   }
 
-  async function logout() {
-    await authApi.logout();
+  function logout() {
+    // No real async work here — authApi.logout() only clears local
+    // storage/token synchronously. Previously this was `async function
+    // logout() { await authApi.logout(); ... }`: awaiting ANY promise,
+    // even one already resolved, unconditionally defers everything after
+    // it to a microtask. That gap — navigate("/") running synchronously
+    // in the click handler, profile clearing one microtask later — was
+    // the actual root cause of the login-page flash on logout: a real,
+    // if narrow, window where the route hadn't fully settled while auth
+    // state was still mid-transition. Doing this synchronously closes
+    // that window entirely rather than trying to out-time it.
+    authApi.logout();
     setProfile(null);
     setUserId(null);
   }
 
   return (
-    <AuthContext.Provider value={{ profile, userId, loading, login, register, logout, refreshProfile }}>
+    <AuthContext.Provider
+      value={{
+        profile,
+        userId,
+        loading,
+        login,
+        register,
+        logout,
+        refreshProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -55,9 +55,14 @@ export default {
   navHow: "How it works",
   navFeatures: "Features",
   navReport: "Report",
-  navBrowse: "Browse",
+  navBrowse: "My Reports",
   navDashboard: "Dashboard",
   navToggleTheme: "Toggle theme",
+  navOpenMenu: "Open menu",
+  navCloseMenu: "Close menu",
+  navMenu: "Menu",
+  navLightMode: "Light mode",
+  navDarkMode: "Dark mode",
   navNotifications: "Notifications",
   navLogin: "Log in",
   ctaStart: "Get started",
@@ -69,7 +74,9 @@ export default {
   heroSub:
     "Next-generation semantic AI that understands your belongings and connects them to reports in seconds — no keywords required.",
   ctaReport: "Report a lost item",
-  ctaBrowse: "Browse reports",
+  ctaBrowse: "My Reports",
+  heroSmartSearchLabel: "Smart Search",
+  heroSmartSearchHint: "Describe what you lost, and let Luqya search for it.",
 
   // Semantic demo
   semTitle: "Semantic Understanding",
@@ -129,17 +136,12 @@ export default {
   uCity: "Smart cities",
 
   // Footer
-  footTag:
-    "Redefining trust in the digital age through intelligent recovery. Proudly built for the vision of tomorrow.",
-  footProduct: "Product",
-  footCompany: "Company",
-  footRights: "© 2024 Luqya AI. Riyadh, Saudi Arabia.",
-  footFeatures: "Features",
-  footAiLogic: "AI logic",
-  footSecurity: "Security",
-  footAbout: "About",
-  footLeap: "LEAP",
-  footCareers: "Careers",
+  footTag: "Luqya is a lost-and-found platform that helps connect reports through semantic search and AI-assisted matching.",
+  footNavigation: "Navigation",
+  footAccount: "Account",
+  footLogin: "Log in",
+  footRegister: "Create account",
+  footRights: "© {year} Luqya",
 
   // Report — shared field labels
   reportTitle: "Report an item",

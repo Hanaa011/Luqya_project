@@ -1,37 +1,21 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Loader2, ArrowRight, ArrowLeft, KeyRound, AlertCircle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { LifeBuoy, KeyRound, MailX, CircleAlert, ArrowLeft } from "lucide-react";
 import AuthShell from "../../components/AuthShell";
 import { useI18n } from "../../lib/useI18n";
-import { sendPasswordResetCode } from "../../api/auth";
+
+// This project has no email/SMS/push delivery and no OTP mechanism — the
+// previous "send a verification code" flow could never actually deliver
+// anything, so it was a broken promise from the user's perspective. This
+// page no longer pretends otherwise: it's a genuine, honest hand-off to
+// human support instead of a fake automated flow.
+//
+// NOTE for whoever owns this: SUPPORT_EMAIL below is a placeholder
+// (support@luqya.app), not a verified/monitored address — replace it with
+// the team's real support contact before this ships.
+const SUPPORT_EMAIL = "support@luqya.app";
 
 export default function ForgotPassword() {
-  const { t, dir, locale } = useI18n();
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    try {
-      await sendPasswordResetCode({ email });
-      navigate(`/auth/verify?flow=reset&email=${encodeURIComponent(email)}`);
-    } catch {
-      setError(
-        {
-          ar: "تعذّر إرسال رمز التحقق. تأكد من البريد الإلكتروني وحاول مرة أخرى.",
-          en: "Couldn't send the reset code. Check the email and try again.",
-          ur: "کوڈ نہیں بھیجا جا سکا۔ ای میل چیک کر کے دوبارہ کوشش کریں۔",
-        }[locale]
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { t, dir } = useI18n();
 
   return (
     <AuthShell
@@ -43,36 +27,34 @@ export default function ForgotPassword() {
         <KeyRound className="size-5" />
       </div>
 
-      {error && (
-        <div className="mb-5 flex items-start gap-2.5 rounded-2xl bg-error-tint text-error px-4 py-3 text-sm">
-          <AlertCircle className="size-4 shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
-      )}
+      <div className="rounded-2xl border border-border bg-stone-50 p-5 mb-6">
+        <h2 className="text-sm font-bold mb-3">{t("recoveryCardTitle")}</h2>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li className="flex items-center gap-2.5">
+            <KeyRound className="size-3.5 shrink-0 text-primary" />
+            {t("recoveryReasonPassword")}
+          </li>
+          <li className="flex items-center gap-2.5">
+            <MailX className="size-3.5 shrink-0 text-primary" />
+            {t("recoveryReasonEmail")}
+          </li>
+          <li className="flex items-center gap-2.5">
+            <CircleAlert className="size-3.5 shrink-0 text-primary" />
+            {t("recoveryReasonOther")}
+          </li>
+        </ul>
+        <p className="text-xs text-muted-foreground mt-4 pt-4 border-t border-border">
+          {t("recoveryCardNote")}
+        </p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder={t("emailPh")}
-          className="w-full px-5 py-3.5 rounded-2xl bg-stone-50 border border-stone-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
-        />
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3.5 rounded-2xl font-semibold shadow-glow hover:-translate-y-0.5 transition-transform disabled:opacity-70 disabled:translate-y-0"
-        >
-          {loading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <ArrowRight className={`size-4 ${dir === "rtl" ? "rotate-180" : ""}`} />
-          )}
-          {t("sendResetCta")}
-        </button>
-      </form>
+      <a
+        href={`mailto:${SUPPORT_EMAIL}`}
+        className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3.5 rounded-2xl font-semibold shadow-glow hover:-translate-y-0.5 transition-transform"
+      >
+        <LifeBuoy className="size-4" />
+        {t("contactSupportCta")}
+      </a>
 
       <Link
         to="/auth/login"

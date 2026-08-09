@@ -56,6 +56,7 @@ export default function ReportLost() {
   const [imageFile, setImageFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [matches, setMatches] = useState([]);
+  const [createdReportId, setCreatedReportId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [knownLocations, setKnownLocations] = useState([]);
   const [guest, setGuest] = useState({
@@ -135,6 +136,7 @@ export default function ReportLost() {
     setSubmitting(true);
     setPhase("searching");
     setStageIndex(0);
+    setCreatedReportId(null);
 
     const stageTimer = window.setInterval(() => {
       setStageIndex((i) => Math.min(i + 1, STAGES.length - 2)); // holds at "matching"
@@ -156,7 +158,11 @@ export default function ReportLost() {
         }),
       });
 
-      if (report?.reporterId) setKnownReporterId(report.reporterId);
+      if (report?.reporterId) {
+        setKnownReporterId(report.reporterId);
+      }
+
+      setCreatedReportId(report?.id ?? null);
 
       const imageBase64 = await imageFileToBase64(imageFile);
 
@@ -169,8 +175,8 @@ export default function ReportLost() {
       });
 
       // Exclude the user's own reports from recovery candidates — only
-      // when ownership can be verified via the real creatorId audit
-      // field, not a guess. Same mechanism as SmartSearch.jsx.
+      // when ownership can be verified via the real Report.CreatorId
+      // chain, not a guess. Same mechanism as SmartSearch.jsx.
       if (userId && results && results.length > 0) {
         const mine = await fetchMyReports({ userId });
         if (mine.reliable && mine.reports.length > 0) {
@@ -201,6 +207,14 @@ export default function ReportLost() {
             ar: "انتهت جلستك. سجّل الدخول مرة أخرى.",
             en: "Your session expired. Please log in again.",
             ur: "آپ کا سیشن ختم ہو گیا۔ دوبارہ لاگ ان کریں۔",
+          })
+        );
+      } else if (err instanceof ApiError && err.code === "LostFound:Reporter:0004") {
+        setErrorMsg(
+          tr({
+            ar: "رقم الجوال هذا مسجل مسبقًا بحساب آخر.",
+            en: "This phone number is already registered to another account.",
+            ur: "یہ فون نمبر پہلے سے کسی دوسرے اکاؤنٹ سے رجسٹرڈ ہے۔",
           })
         );
       } else {
@@ -256,7 +270,9 @@ export default function ReportLost() {
           <SearchingView t={t} stageIndex={stageIndex} preview={preview} />
         )}
 
-        {phase === "results" && <MatchesView t={t} lang={lang} matches={matches} />}
+        {phase === "results" && (
+          <MatchesView t={t} lang={lang} matches={matches} sourceReportId={createdReportId} />
+        )}
         {phase === "empty" && <EmptyView t={t} />}
       </div>
     </section>
@@ -528,7 +544,7 @@ function SearchingView({ t, stageIndex, preview }) {
   );
 }
 
-function MatchesView({ t, matches }) {
+function MatchesView({ t, matches, sourceReportId }) {
   return (
     <div className="animate-rise-in">
       <div className="text-center mb-12">
@@ -548,7 +564,7 @@ function MatchesView({ t, matches }) {
         {matches.map((m) => (
           <Link
             key={m.reportId}
-            to={`/match/${m.reportId}`}
+            to={sourceReportId ? `/match/${m.reportId}?from=${sourceReportId}` : `/match/${m.reportId}`}
             className="group rounded-[1.75rem] border border-border bg-card overflow-hidden shadow-soft hover:shadow-luxe hover:-translate-y-1 transition-all"
           >
             <div className="aspect-[16/10] bg-gradient-to-br from-stone-100 to-stone-200 relative grid place-items-center">

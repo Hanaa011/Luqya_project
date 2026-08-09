@@ -55,9 +55,14 @@ export default {
   navHow: "یہ کیسے کام کرتا ہے",
   navFeatures: "خصوصیات",
   navReport: "رپورٹ کریں",
-  navBrowse: "براؤز کریں",
+  navBrowse: "میری رپورٹس",
   navDashboard: "ڈیش بورڈ",
   navToggleTheme: "تھیم تبدیل کریں",
+  navOpenMenu: "مینو کھولیں",
+  navCloseMenu: "مینو بند کریں",
+  navMenu: "مینو",
+  navLightMode: "لائٹ موڈ",
+  navDarkMode: "ڈارک موڈ",
   navNotifications: "اطلاعات",
   navLogin: "لاگ ان",
   ctaStart: "ابھی شروع کریں",
@@ -69,7 +74,9 @@ export default {
   heroSub:
     "جدید ترین سیمینٹک اے آئی جو آپ کی اشیاء کو سمجھتی ہے اور انہیں سیکنڈوں میں رپورٹس سے جوڑتی ہے — کی ورڈ کی کوئی ضرورت نہیں۔",
   ctaReport: "گمشدہ چیز کی رپورٹ کریں",
-  ctaBrowse: "رپورٹس دیکھیں",
+  ctaBrowse: "میری رپورٹس",
+  heroSmartSearchLabel: "ذہین تلاش",
+  heroSmartSearchHint: "اپنی کھوئی ہوئی چیز بیان کریں، اور لُقیا کو تلاش کرنے دیں۔",
 
   // Semantic demo
   semTitle: "سیمینٹک تفہیم",
@@ -129,16 +136,12 @@ export default {
   uCity: "اسمارٹ شہر",
 
   // Footer
-  footTag: "ذہین بازیابی کے نظام کے ذریعے ڈیجیٹل دور میں اعتماد کی نئی تعریف۔ کل کے وژن کے لیے فخر سے تیار کیا گیا۔",
-  footProduct: "پروڈکٹ",
-  footCompany: "کمپنی",
-  footRights: "© 2024 لقیا اے آئی۔ ریاض، سعودی عرب۔",
-  footFeatures: "خصوصیات",
-  footAiLogic: "اے آئی منطق",
-  footSecurity: "سیکیورٹی",
-  footAbout: "تعارف",
-  footLeap: "LEAP",
-  footCareers: "ملازمتیں",
+  footTag: "لقیا گمشدہ اور ملنے والی اشیاء کا پلیٹ فارم ہے جو سیمینٹک تلاش اور اے آئی معاون میچنگ کے ذریعے رپورٹس کو جوڑنے میں مدد کرتا ہے۔",
+  footNavigation: "نیویگیشن",
+  footAccount: "اکاؤنٹ",
+  footLogin: "لاگ ان",
+  footRegister: "اکاؤنٹ بنائیں",
+  footRights: "© {year} لقیا",
 
   // Report — shared field labels
   reportTitle: "چیز کی رپورٹ کریں",

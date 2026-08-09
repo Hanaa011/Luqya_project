@@ -4,7 +4,6 @@ import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Nav from "./components/Nav";
 import Footer from "./components/Footer";
 import SplashIntro from "./components/SplashIntro";
-import ScrollToTop from "./components/ScrollToTop";
 
 import Home from "./pages/Home";
 import Report from "./pages/Report";
@@ -14,13 +13,14 @@ import Browse from "./pages/Browse";
 import SmartSearch from "./pages/SmartSearch";
 import Dashboard from "./pages/Dashboard";
 import Match from "./pages/Match";
+import Contact from "./pages/Contact";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import VerifyOtp from "./pages/auth/VerifyOtp";
 import NotificationComposer from "./pages/admin/NotificationComposer";
 import RequireAuth from "./components/RequireAuth";
-import Contact from "./pages/Contact";
+
 
 function NotFound() {
   return (
@@ -62,8 +62,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <ScrollToTop />
-
       {showSplash && <SplashIntro onDone={dismissSplash} />}
 
       {!isAuthRoute && <Nav />}
@@ -74,14 +72,7 @@ export default function App() {
           <Route path="/report" element={<Report />} />
           <Route path="/report/lost" element={<ReportLost />} />
           <Route path="/report/found" element={<ReportFound />} />
-          <Route
-            path="/browse"
-            element={
-              <RequireAuth>
-                <Browse />
-              </RequireAuth>
-            }
-          />
+          <Route path="/browse" element={<Browse />} />
           <Route path="/search" element={<SmartSearch />} />
           <Route
             path="/dashboard"
@@ -93,13 +84,13 @@ export default function App() {
           />
           <Route path="/match/:id" element={<Match />} />
           <Route
-  path="/match/:id/contact"
-  element={
-    <RequireAuth>
-      <Contact />
-    </RequireAuth>
-  }
-/>
+            path="/match/:id/contact"
+            element={
+              <RequireAuth>
+                <Contact />
+              </RequireAuth>
+            }
+          />
 
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/register" element={<Register />} />

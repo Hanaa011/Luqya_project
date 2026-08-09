@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, MapPin, Clock, Filter, Loader2, AlertCircle, LogIn } from "lucide-react";
+import { Search, MapPin, Clock, Loader2, AlertCircle, LogIn } from "lucide-react";
 
 import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
-import { listReports } from "../api/reports";
+import { fetchMyReports } from "../lib/myReports";
 import { ReportType, reportStatusLabelKey } from "../api/enums";
 
 export default function Browse() {
@@ -12,7 +12,7 @@ export default function Browse() {
   const { profile, userId, loading: authLoading } = useAuth();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
-  const [rows, setRows] = useState([]);
+  const [allRows, setAllRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -21,14 +21,15 @@ export default function Browse() {
   }, []);
 
   useEffect(() => {
-    // Browse is now a personal "my reports" view, not a public report
+    // Browse is a personal "my reports" view, not a public report
     // browser — guests never get report cards, and never trigger the
     // request at all, so no report data is ever fetched for them.
+    let cancelled = false;
+
     if (authLoading || !userId) {
-      let cancelled = false;
       Promise.resolve().then(() => {
         if (cancelled) return;
-        setRows([]);
+        setAllRows([]);
         setLoading(false);
       });
       return () => {
@@ -36,47 +37,60 @@ export default function Browse() {
       };
     }
 
-    const controller = new AbortController();
-    const debounce = window.setTimeout(() => {
+    Promise.resolve().then(() => {
+      if (cancelled) return;
       setLoading(true);
       setError(null);
+    });
 
-      // There is no real server-side "my reports" filter today (verified
-      // against GetReportListDto.cs / ReportAppService.cs — no CreatorId
-      // property, no CreatorId clause). So this fetches a page and keeps
-      // only the rows whose own `creatorId` matches the current user —
-      // the same verified workaround used in lib/myReports.js. Known
-      // limitation: a user's reports beyond `maxResultCount` in the
-      // global feed won't appear here without a real backend filter.
-      listReports(
-        {
-          filter: q.trim() || undefined,
-          type: filter === "all" ? undefined : filter === "lost" ? ReportType.LOST : ReportType.FOUND,
-          sorting: "creationTime desc",
-          maxResultCount: 300,
-        },
-        controller.signal
-      )
-        .then((res) => setRows((res?.items ?? []).filter((r) => r.creatorId === userId)))
-        .catch((err) => {
-          if (err.name !== "AbortError") {
-            setError(
-              tr({
-                ar: "تعذّر تحميل البلاغات. حاول مرة أخرى.",
-                en: "Couldn't load reports. Please try again.",
-                ur: "رپورٹس لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
-              })
-            );
-          }
-        })
-        .finally(() => setLoading(false));
-    }, 300);
+    // Same single source of truth as Dashboard — ownership via
+    // Report.CreatorId, filtered client-side (see lib/myReports.js). Any
+    // q/type filtering below happens client-side, on top of an already
+    // ownership-verified list.
+    fetchMyReports({ userId, maxResultCount: 500, signal: undefined })
+      .then((res) => {
+        if (cancelled) return;
+        setAllRows(res.reliable ? res.reports : []);
+        if (!res.reliable) {
+          setError(
+            tr({
+              ar: "تعذّر تحميل البلاغات. حاول مرة أخرى.",
+              en: "Couldn't load reports. Please try again.",
+              ur: "رپورٹس لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
+            })
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(
+            tr({
+              ar: "تعذّر تحميل البلاغات. حاول مرة أخرى.",
+              en: "Couldn't load reports. Please try again.",
+              ur: "رپورٹس لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
+            })
+          );
+        }
+      })
+      .finally(() => !cancelled && setLoading(false));
 
     return () => {
-      window.clearTimeout(debounce);
-      controller.abort();
+      cancelled = true;
     };
-  }, [q, filter, tr, authLoading, userId]);
+  }, [tr, authLoading, userId]);
+
+  const rows = allRows.filter((report) => {
+    if (filter !== "all") {
+      const wantType = filter === "lost" ? ReportType.LOST : ReportType.FOUND;
+      if (report.type !== wantType) return false;
+    }
+    if (q.trim()) {
+      const needle = q.trim().toLowerCase();
+      const haystack = `${report.description ?? ""} ${report.locationDetails ?? ""}`.toLowerCase();
+      if (!haystack.includes(needle)) return false;
+    }
+    return true;
+  });
 
   return (
     <section className="py-16 lg:py-24">
@@ -90,7 +104,7 @@ export default function Browse() {
         </p>
 
         {!authLoading && !profile && (
-          <div className="flex flex-col items-center text-center gap-4 py-24 border border-dashed border-border rounded-[2rem]">
+          <div className="flex flex-col items-center text-center gap-4 py-16 sm:py-24 border border-dashed border-border rounded-[2rem]">
             <span className="grid size-14 place-items-center rounded-full bg-primary/5 text-primary">
               <LogIn className="size-6" />
             </span>
@@ -146,14 +160,6 @@ export default function Browse() {
                   </button>
                 ))}
               </div>
-
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-card border border-border text-sm font-semibold hover:bg-stone-100 transition-colors"
-              >
-                <Filter className="size-4" />
-                {lang === "ar" ? "تصفية" : "Filters"}
-              </button>
             </div>
 
             {(loading || authLoading) && (

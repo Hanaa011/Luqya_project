@@ -121,7 +121,9 @@ export default function ReportFound() {
         }),
       });
 
-      if (report?.reporterId) setKnownReporterId(report.reporterId);
+      if (report?.reporterId) {
+        setKnownReporterId(report.reporterId);
+      }
 
       setPhase("thanks");
     } catch (err) {
@@ -133,6 +135,14 @@ export default function ReportFound() {
             ar: "انتهت جلستك. سجّل الدخول مرة أخرى.",
             en: "Your session expired. Please log in again.",
             ur: "آپ کا سیشن ختم ہو گیا۔ دوبارہ لاگ ان کریں۔",
+          })
+        );
+      } else if (err instanceof ApiError && err.code === "LostFound:Reporter:0004") {
+        setErrorMsg(
+          tr({
+            ar: "رقم الجوال هذا مسجل مسبقًا بحساب آخر.",
+            en: "This phone number is already registered to another account.",
+            ur: "یہ فون نمبر پہلے سے کسی دوسرے اکاؤنٹ سے رجسٹرڈ ہے۔",
           })
         );
       } else {

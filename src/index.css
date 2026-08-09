@@ -424,3 +424,20 @@
 @utility animate-lantern-glow {
   animation: lantern-glow 3.4s ease-in-out infinite;
 }
+
+/* Scroll-reveal primitives (src/components/Reveal.jsx). Transform/opacity
+   only — no width/height/position animated, so this never triggers
+   layout thrash. */
+.reveal {
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

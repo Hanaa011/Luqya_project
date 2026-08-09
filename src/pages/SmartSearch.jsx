@@ -57,8 +57,8 @@ export default function SmartSearch() {
       // Exclude the current user's own reports from recovery candidates —
       // only when ownership can be verified from real data. AiSearchResultDto
       // has no ownership field of its own, so this cross-references against
-      // reports whose creatorId (ABP's real, authenticated-user audit field)
-      // matches the current user — not a cached, session-only guess.
+      // the current user's own reports (resolved via Report.CreatorId in
+      // fetchMyReports) — not a cached, session-only guess.
       if (userId) {
         const mine = await fetchMyReports({ userId });
         if (mine.reliable && mine.reports.length > 0) {

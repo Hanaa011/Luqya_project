@@ -1,124 +1,116 @@
 import { Link } from "react-router-dom";
 import { useI18n } from "../lib/useI18n";
+import { useAuth } from "../lib/useAuth";
 import Logo from "./Logo";
 
 export default function Footer() {
   const { t } = useI18n();
+  const { profile } = useAuth();
+
+  const year = new Date().getFullYear();
+
+  const linkClass =
+    "inline-block py-1 text-sm text-muted-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 rounded-sm";
 
   return (
-    <footer className="py-20 border-t border-border bg-background">
-      <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-12">
-        <div className="col-span-2">
-          <div className="flex items-baseline gap-2.5 mb-5">
-            <Logo tone="default" wordmark className="size-7" wordmarkClassName="text-2xl" />
+    <footer className="border-t border-border bg-background">
+      <div className="max-w-7xl mx-auto px-6 py-12 lg:py-14">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
+          {/* Brand */}
+          <div className="sm:col-span-2 lg:col-span-2">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-3 mb-4 group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+             
+            >
+              <Logo
+                wordmark
+                className="size-7"
+                wordmarkClassName="text-2xl"
+              />
 
-            <span className="font-body text-base font-medium text-foreground/40">
-              Luqya
-            </span>
+              <span className="font-body text-base font-medium text-foreground/40 group-hover:text-foreground/60 transition-colors">
+                Luqya
+              </span>
+            </Link>
+
+            <p className="text-sm text-muted-foreground max-w-sm leading-7">
+              {t("footTag")}
+            </p>
           </div>
 
-          <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-            {t("footTag")}
-          </p>
-        </div>
+          {/* Navigation */}
+          <div>
+            <h5 className="font-bold mb-4 text-sm text-foreground">
+              {t("footNavigation")}
+            </h5>
 
-        <div>
-          <h5 className="font-bold mb-4 text-sm">
-            {t("footProduct")}
-          </h5>
+            <ul className="space-y-2">
+              <li>
+                <Link to="/" className={linkClass}>
+                  {t("navHome")}
+                </Link>
+              </li>
 
-          <ul className="text-sm text-muted-foreground space-y-2.5">
-            <li>
-              <a
-                href="#features"
-                className="hover:text-primary transition-colors"
-              >
-                {t("footFeatures")}
-              </a>
-            </li>
+              <li>
+                <Link to="/report" className={linkClass}>
+                  {t("navReport")}
+                </Link>
+              </li>
 
-            <li>
-              <a
-                href="#how"
-                className="hover:text-primary transition-colors"
-              >
-                {t("footAiLogic")}
-              </a>
-            </li>
-
-            <li>
-              <a
-                href="#security"
-                className="hover:text-primary transition-colors"
-              >
-                {t("footSecurity")}
-              </a>
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <h5 className="font-bold mb-4 text-sm">
-            {t("footCompany")}
-          </h5>
-
-          <ul className="text-sm text-muted-foreground space-y-2.5">
-            <li>
-              <a
-                href="#about"
-                className="hover:text-primary transition-colors"
-              >
-                {t("footAbout")}
-              </a>
-            </li>
-
-            <li>
-              <a
-                href="#leap"
-                className="hover:text-primary transition-colors"
-              >
-                {t("footLeap")}
-              </a>
-            </li>
-
-            <li>
-              <a
-                href="#careers"
-                className="hover:text-primary transition-colors"
-              >
-                {t("footCareers")}
-              </a>
-            </li>
-          </ul>
-        </div>
-
-        <div className="col-span-2 flex flex-col items-start md:items-end">
-          <div className="flex gap-3 mb-6">
-            <a
-              href="#"
-              className="size-10 rounded-full border border-border flex items-center justify-center hover:bg-stone-100 transition-colors font-mono text-sm"
-            >
-              𝕏
-            </a>
-
-            <a
-              href="#"
-              className="size-10 rounded-full border border-border flex items-center justify-center hover:bg-stone-100 transition-colors font-mono text-xs font-bold"
-            >
-              in
-            </a>
+              <li>
+                <Link to="/search" className={linkClass}>
+                  {t("navSearch")}
+                </Link>
+              </li>
+            </ul>
           </div>
 
-          <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-            {t("footRights")}
-          </p>
+          {/* Account */}
+          <div>
+            <h5 className="font-bold mb-4 text-sm text-foreground">
+              {t("footAccount")}
+            </h5>
 
-          <Link
-            to="/admin/notify"
-            className="mt-3 text-[10px] font-mono text-muted-foreground/50 uppercase tracking-widest hover:text-primary transition-colors"
-          >
-            Staff · Notification console
-          </Link>
+            <ul className="space-y-2">
+              {profile ? (
+                <>
+                  <li>
+                    <Link to="/browse" className={linkClass}>
+                      {t("navBrowse")}
+                    </Link>
+                  </li>
+
+                  <li>
+                    <Link to="/dashboard" className={linkClass}>
+                      {t("navDashboard")}
+                    </Link>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <Link to="/auth/login" className={linkClass}>
+                      {t("footLogin")}
+                    </Link>
+                  </li>
+
+                  <li>
+                    <Link to="/auth/register" className={linkClass}>
+                      {t("footRegister")}
+                    </Link>
+                  </li>
+                </>
+              )}
+            </ul>
+          </div>
+
+          {/* Copyright */}
+          <div className="sm:col-span-2 lg:col-span-1 flex lg:justify-end">
+            <p className="text-xs text-muted-foreground/70 leading-relaxed lg:text-end">
+              {t("footRights").replace("{year}", year)}
+            </p>
+          </div>
         </div>
       </div>
     </footer>

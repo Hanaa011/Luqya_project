@@ -3,10 +3,11 @@ import { api } from "./httpClient";
 // ReportAppService.GetListAsync(GetReportListDto) -> GET api/app/report -> PagedResultDto<ReportDto>
 // NOTE: GetReportListDto has no CreatorId property, and GetListAsync's
 // .WhereIf(...) chain never filters by creator — there is no server-side
-// "my reports" filter today. Do not pass a creatorId param here; it would
-// be silently ignored, which is exactly what caused the account-data-
-// leak bug (see lib/myReports.js for the verified root cause and the
-// client-side filtering workaround that actually works).
+// "my reports" filter via CreatorId. Ownership filtering fetches a page
+// and filters client-side by report.creatorId instead — see
+// lib/myReports.js. `reporterId` here is a real, separate, working
+// server-side filter, kept for contact/reporter-record purposes only,
+// not account ownership.
 export function listReports({ filter, type, status, locationId, reporterId, categoryId, sorting, skipCount, maxResultCount } = {}, signal) {
   return api.get(
     "/api/app/report",
@@ -69,13 +70,3 @@ export function deleteReport(id) {
 export function getReportAnalytics(topN, signal) {
   return api.get("/api/app/report-analytics", { topN }, signal);
 }
-
-/**
- * There is no verified file/image upload endpoint on this backend.
- * `imagePath` is only ever sent when it's already a real hosted URL —
- * which never happens today, so report creation simply omits it. Photos
- * stay local-preview-only until an upload endpoint exists; do not invent
- * one and do not send base64 data through this string field (unlike
- * AiSearchInputDto.ImageBase64, which is verified to accept base64 —
- * see api/search.js).
- */

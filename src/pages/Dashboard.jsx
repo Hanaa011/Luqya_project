@@ -1,48 +1,49 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  TrendingUp,
-  Package,
-  Sparkles,
-  Clock,
-  Loader2,
   AlertCircle,
-  UserCircle,
-  Search,
-  PlusCircle,
-  Compass,
-  ArrowRight,
+  Loader2,
 } from "lucide-react";
 
 import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
 import { listMatches } from "../api/matches";
 import { fetchMyReports } from "../lib/myReports";
-import { ReportStatus, MatchStatus, reportStatusLabelKey } from "../api/enums";
+import { MatchStatus, ReportStatus, ReportType, matchStatusLabelKey, reportStatusLabelKey } from "../api/enums";
+
+function copy(lang, values) {
+  return values[lang] ?? values.en;
+}
+
+function reportTitle(report, fallback) {
+  const [maybeTitle, ...rest] = (report?.description ?? "").split(" — ");
+  return rest.length ? maybeTitle : report?.aiObjectType || fallback;
+}
+
+function formatDate(value, lang) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function matchScoreValue(match) {
+  const value = Number(match?.similarityScore);
+  return Number.isFinite(value) ? value : -1;
+}
 
 export default function Dashboard() {
-  const { t, lang, tr } = useI18n();
-  const { profile, userId } = useAuth();
+  const { t, lang } = useI18n();
+  const { userId } = useAuth();
 
-  // --- The current user's own reports — there is no real server-side
-  // creatorId filter (see lib/myReports.js), so this is fetched globally
-  // and filtered client-side by each report's own creatorId field. ---
-  const [loadingMine, setLoadingMine] = useState(true);
-  const [mineError, setMineError] = useState(null);
-  const [myCounts, setMyCounts] = useState({ total: 0, open: 0, matched: 0, closed: 0 });
-  const [myRecent, setMyRecent] = useState([]);
-
-  // --- Pending matches that involve one of the user's own reports ---
-  // MatchAppService.GetListAsync has no owner filter (verified against
-  // MatchAppService.cs — it's a plain PagedAndSortedResultRequestDto), so
-  // this cross-references the same way SmartSearch already does for "my
-  // own reports excluded": fetch my real report ids via the verified
-  // creatorId (real per-item field, just not a query filter — see above),
-  // then keep only matches whose lostReportId or
-  // foundReportId is one of mine. Never another user's match data.
-  const [loadingMatches, setLoadingMatches] = useState(true);
+  const [loadingReports, setLoadingReports] = useState(true);
+  const [reportsError, setReportsError] = useState(false);
+  const [reports, setReports] = useState([]);
   const [myReportIds, setMyReportIds] = useState(new Set());
-  const [myMatches, setMyMatches] = useState([]);
+
+  const [loadingMatches, setLoadingMatches] = useState(true);
+  const [matchesError, setMatchesError] = useState(false);
+  const [matches, setMatches] = useState([]);
+  const [matchWindowPartial, setMatchWindowPartial] = useState(false);
+  const [showAllPending, setShowAllPending] = useState(false);
 
   useEffect(() => {
     document.title = "Dashboard — Luqya";
@@ -52,296 +53,677 @@ export default function Dashboard() {
     let cancelled = false;
 
     if (!userId) {
-      Promise.resolve().then(() => !cancelled && setLoadingMine(false));
+      Promise.resolve().then(() => {
+        if (!cancelled) setLoadingReports(false);
+      });
       return () => {
         cancelled = true;
       };
     }
 
-    Promise.resolve().then(() => !cancelled && setLoadingMine(true));
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setLoadingReports(true);
+      setReportsError(false);
+    });
 
-    // A single fetch, filtered client-side by the report's own `creatorId`
-    // field (see lib/myReports.js for why this can't be a server-side
-    // query param). Counts below are derived from this same array rather
-    // than reading `totalCount` from separately "creatorId-filtered"
-    // requests — those totals were previously the *global* count for
-    // that status, not this user's, which was one concrete symptom of
-    // the account-data-leak bug.
     fetchMyReports({ userId, maxResultCount: 500 })
-      .then((recent) => {
+      .then((result) => {
         if (cancelled) return;
-        const mine = recent.reliable ? recent.reports : [];
-        setMyCounts({
-          total: mine.length,
-          open: mine.filter((r) => r.status === ReportStatus.OPEN).length,
-          matched: mine.filter((r) => r.status === ReportStatus.MATCHED).length,
-          closed: mine.filter((r) => r.status === ReportStatus.CLOSED).length,
-        });
-        setMyRecent(mine.slice(0, 6));
-        setMyReportIds(new Set(mine.map((r) => r.id)));
-        if (!recent.reliable) {
-          setMineError(tr({
-            ar: "تعذّر التحقق من بلاغاتك حاليًا. حاول تسجيل الخروج والدخول مرة أخرى.",
-            en: "Couldn't verify your reports right now. Try logging out and back in.",
-            ur: "آپ کی رپورٹس کی تصدیق نہیں ہو سکی۔ لاگ آؤٹ کر کے دوبارہ لاگ ان کریں۔",
-          }));
+        if (!result.reliable) {
+          setReportsError(true);
+          setReports([]);
+          setMyReportIds(new Set());
+          return;
         }
+
+        const mine = result.reports ?? [];
+        setReports(mine);
+        setMyReportIds(new Set(mine.map((report) => report.id)));
       })
-      .catch(() => !cancelled && setMineError(tr({
-        ar: "تعذّر تحميل بلاغاتك.",
-        en: "Couldn't load your reports.",
-        ur: "آپ کی رپورٹس لوڈ نہیں ہو سکیں۔",
-      })))
-      .finally(() => !cancelled && setLoadingMine(false));
+      .catch(() => {
+        if (cancelled) return;
+        setReportsError(true);
+        setReports([]);
+        setMyReportIds(new Set());
+      })
+      .finally(() => !cancelled && setLoadingReports(false));
 
     return () => {
       cancelled = true;
     };
-  }, [userId, tr]);
+  }, [userId]);
 
   useEffect(() => {
     let cancelled = false;
 
     if (!userId || myReportIds.size === 0) {
-      Promise.resolve().then(() => !cancelled && setLoadingMatches(false));
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setLoadingMatches(false);
+          setMatches([]);
+        }
+      });
       return () => {
         cancelled = true;
       };
     }
 
-    Promise.resolve().then(() => !cancelled && setLoadingMatches(true));
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setLoadingMatches(true);
+      setMatchesError(false);
+    });
 
-    listMatches({ maxResultCount: 100, sorting: "creationTime desc" })
-      .then((res) => {
+    // MatchAppService currently has no report/owner filter. We therefore
+    // cross-reference the newest window against the user's verified report
+    // ids. Importantly, we keep ALL statuses here; only the attention section
+    // filters to Pending. This fixes the old mismatch where accepted/rejected
+    // matches vanished from Dashboard while still appearing on report details.
+    listMatches({ maxResultCount: 200, sorting: "creationTime desc" })
+      .then((result) => {
         if (cancelled) return;
-        const mine = (res?.items ?? []).filter(
-          (m) =>
-            m.status === MatchStatus.PENDING &&
-            (myReportIds.has(m.lostReportId) || myReportIds.has(m.foundReportId))
+        const items = result?.items ?? [];
+        setMatchWindowPartial((result?.totalCount ?? items.length) > items.length);
+        setMatches(
+          items.filter((match) => myReportIds.has(match.lostReportId) || myReportIds.has(match.foundReportId))
         );
-        setMyMatches(mine);
       })
-      .catch(() => !cancelled && setMyMatches([]))
+      .catch(() => {
+        if (cancelled) return;
+        setMatchesError(true);
+        setMatches([]);
+      })
       .finally(() => !cancelled && setLoadingMatches(false));
 
     return () => {
       cancelled = true;
     };
-  }, [userId, myReportIds]);
+  }, [myReportIds, userId]);
 
-  const myKpis = [
-    { label: lang === "ar" ? "إجمالي بلاغاتي" : "My total reports", value: myCounts.total, Icon: TrendingUp },
-    { label: lang === "ar" ? "قيد المعالجة" : "Open", value: myCounts.open, Icon: Clock },
-    { label: lang === "ar" ? "متطابقة" : "Matched", value: myCounts.matched, Icon: Sparkles },
-    { label: lang === "ar" ? "مغلقة" : "Closed", value: myCounts.closed, Icon: Package },
-  ];
+  const activeReports = useMemo(
+    () => reports.filter((report) => report.status !== ReportStatus.CLOSED).slice(0, 6),
+    [reports]
+  );
+  const resolvedReports = useMemo(
+    () => reports.filter((report) => report.status === ReportStatus.CLOSED).slice(0, 4),
+    [reports]
+  );
+  const acceptedOwnedReportIds = useMemo(() => {
+    const acceptedIds = new Set();
+
+    matches.forEach((match) => {
+      if (match.status !== MatchStatus.ACCEPTED) return;
+
+      if (myReportIds.has(match.lostReportId)) {
+        acceptedIds.add(match.lostReportId);
+      }
+
+      if (myReportIds.has(match.foundReportId)) {
+        acceptedIds.add(match.foundReportId);
+      }
+    });
+
+    return acceptedIds;
+  }, [matches, myReportIds]);
+
+  const pendingMatches = useMemo(
+    () =>
+      matches
+        .filter((match) => match.status === MatchStatus.PENDING)
+        .filter((match) => {
+          const ownedId = myReportIds.has(match.lostReportId)
+            ? match.lostReportId
+            : myReportIds.has(match.foundReportId)
+              ? match.foundReportId
+              : null;
+
+          return !ownedId || !acceptedOwnedReportIds.has(ownedId);
+        })
+        .sort((a, b) => {
+          const scoreDifference = matchScoreValue(b) - matchScoreValue(a);
+          if (scoreDifference !== 0) return scoreDifference;
+
+          return new Date(b.creationTime ?? 0).getTime() - new Date(a.creationTime ?? 0).getTime();
+        }),
+    [acceptedOwnedReportIds, matches, myReportIds]
+  );
+  const decidedMatches = useMemo(
+    () => matches.filter((match) => match.status !== MatchStatus.PENDING).slice(0, 6),
+    [matches]
+  );
+  const reportsById = useMemo(
+    () => new Map(reports.map((report) => [report.id, report])),
+    [reports]
+  );
+  const visiblePendingMatches = showAllPending ? pendingMatches : pendingMatches.slice(0, 2);
+  const hiddenPendingCount = Math.max(0, pendingMatches.length - 2);
+
+  const counts = useMemo(
+    () => ({
+      total: reports.length,
+      active: reports.filter((report) => report.status !== ReportStatus.CLOSED).length,
+      attention: pendingMatches.length,
+      resolved: reports.filter((report) => report.status === ReportStatus.CLOSED).length,
+    }),
+    [pendingMatches, reports]
+  );
+
+
+
+  function ownedReportId(match) {
+    if (myReportIds.has(match.lostReportId)) return match.lostReportId;
+    if (myReportIds.has(match.foundReportId)) return match.foundReportId;
+    return null;
+  }
+
+  function otherReportId(match) {
+    const mine = ownedReportId(match);
+    if (!mine) return null;
+    return mine === match.lostReportId ? match.foundReportId : match.lostReportId;
+  }
 
   return (
-    <section className="py-14 lg:py-20">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-end justify-between mb-10 flex-wrap gap-4">
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-widest text-primary mb-3">
-              Luqya · {lang === "ar" ? "لوحتي" : "My dashboard"}
+    <section className="py-10 sm:py-14 lg:py-20">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <header className="mb-8 max-w-2xl sm:mb-10">
+          <p className="text-[11px] font-mono tracking-[0.18em] text-primary">
+            {copy(lang, {
+              ar: "لُقيا · لوحة التحكم",
+              en: "Luqya · Dashboard",
+              ur: "لُقیا · ڈیش بورڈ",
+            })}
+          </p>
+          <h1 className="mt-2 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
+            {t("navDashboard")}
+          </h1>
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground sm:text-lg">
+            {copy(lang, {
+              ar: "تابع بلاغاتك والمطابقات المهمة من مكان واحد.",
+              en: "Keep track of your reports and important matches in one place.",
+              ur: "اپنی رپورٹس اور اہم میچز ایک جگہ دیکھیں۔",
+            })}
+          </p>
+        </header>
+
+        {reportsError ? (
+          <ErrorState
+            text={copy(lang, {
+              ar: "تعذّر التحقق من بلاغاتك الآن. حاول تحديث الصفحة أو تسجيل الدخول مرة أخرى.",
+              en: "Couldn't verify your reports right now. Refresh the page or sign in again.",
+              ur: "آپ کی رپورٹس کی تصدیق نہیں ہو سکی۔ صفحہ ریفریش کریں یا دوبارہ لاگ ان کریں۔",
+            })}
+          />
+        ) : loadingReports ? (
+          <LoadingState text={copy(lang, { ar: "جارٍ تجهيز لوحة التحكم...", en: "Preparing your dashboard...", ur: "ڈیش بورڈ تیار ہو رہا ہے..." })} />
+        ) : (
+          <>
+            <div className="mb-10 grid grid-cols-2 gap-px overflow-hidden rounded-[1.75rem] border border-border bg-border lg:grid-cols-4">
+              <SummaryItem label={copy(lang, { ar: "كل البلاغات", en: "All reports", ur: "تمام رپورٹس" })} value={counts.total} />
+              <SummaryItem label={copy(lang, { ar: "نشطة", en: "Active", ur: "فعال" })} value={counts.active} />
+              <SummaryItem label={copy(lang, { ar: "تحتاج انتباهك", en: "Needs attention", ur: "توجہ درکار" })} value={counts.attention} highlight />
+              <SummaryItem label={copy(lang, { ar: "مغلقة", en: "Resolved", ur: "حل شدہ" })} value={counts.resolved} />
             </div>
 
-            <h1 className="font-display text-4xl lg:text-5xl font-extrabold tracking-tight">
-              {t("dashTitle")}
-            </h1>
+            <WorkflowSection
+              kicker={copy(lang, { ar: "يحتاج إجراء", en: "Action required", ur: "کارروائی درکار" })}
+              tone="attention"
+              title={copy(lang, { ar: "تحتاج انتباهك", en: "Needs your attention", ur: "آپ کی توجہ درکار" })}
+              description={copy(lang, {
+                ar: "مطابقات بانتظار قرارك، مرتبة من أعلى نسبة إلى الأقل.",
+                en: "Matches waiting for your decision, strongest first.",
+                ur: "آپ کے فیصلے کے منتظر میچز، زیادہ اسکور سے کم اسکور تک۔",
+              })}
+            >
+              {loadingMatches ? (
+                <LoadingState compact text={copy(lang, { ar: "جارٍ تحميل المطابقات...", en: "Loading matches...", ur: "میچز لوڈ ہو رہے ہیں..." })} />
+              ) : matchesError ? (
+                <ErrorState compact text={copy(lang, { ar: "تعذّر تحميل المطابقات.", en: "Couldn't load matches.", ur: "میچز لوڈ نہیں ہو سکے۔" })} />
+              ) : pendingMatches.length > 0 ? (
+                <div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {visiblePendingMatches.map((match) => {
+                      const mineId = ownedReportId(match);
+                      const candidateId = otherReportId(match);
+                      const ownerReport = mineId ? reportsById.get(mineId) : null;
 
-            <p className="text-muted-foreground text-lg mt-2">{t("dashSub")}</p>
-          </div>
-
-          <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-muted-foreground bg-card border border-border px-4 py-2 rounded-full">
-            <span className="size-2 rounded-full bg-primary animate-pulse" />
-            {profile ? (lang === "ar" ? "متصل" : "Live") : lang === "ar" ? "زائر" : "Guest"}
-          </div>
-        </div>
-
-        {/* ---------- My reports — filtered client-side by creatorId ---------- */}
-        <div className="mb-12">
-          <div className="flex items-center gap-2 mb-5">
-            <UserCircle className="size-4 text-primary" />
-            <h2 className="font-display text-xl font-bold">
-              {lang === "ar" ? "بلاغاتي" : "My reports"}
-            </h2>
-          </div>
-
-          {!profile ? (
-            <div className="p-6 rounded-2xl border border-border bg-card text-sm text-muted-foreground">
-              {lang === "ar" ? "سجّل الدخول لعرض بلاغاتك." : "Log in to see your own reports."}
-            </div>
-          ) : loadingMine ? (
-            <div className="flex items-center gap-2 text-muted-foreground py-6">
-              <Loader2 className="size-4 animate-spin" />
-              {lang === "ar" ? "جارٍ التحميل..." : "Loading..."}
-            </div>
-          ) : mineError ? (
-            <div className="flex items-center gap-2.5 rounded-2xl bg-error-tint text-error px-4 py-3 text-sm">
-              <AlertCircle className="size-4 shrink-0" />
-              {mineError}
-            </div>
-          ) : (
-            <>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {myKpis.map(({ label, value, Icon }) => (
-                  <div key={label} className="p-5 rounded-2xl bg-card border border-border">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                        {label}
-                      </span>
-                      <Icon className="size-4 text-primary" />
-                    </div>
-                    <div className="font-display text-3xl font-extrabold tracking-tight">
-                      {value.toLocaleString(lang)}
-                    </div>
+                      return (
+                        <PendingMatchCard
+                          key={match.id}
+                          match={match}
+                          ownerReport={ownerReport}
+                          href={
+                            candidateId && mineId
+                              ? `/match/${candidateId}?from=${mineId}`
+                              : "#"
+                          }
+                          lang={lang}
+                          t={t}
+                        />
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
 
-              {myRecent.length === 0 ? (
-                <div className="p-6 rounded-2xl border border-border bg-card text-sm text-muted-foreground">
-                  {lang === "ar" ? "لا توجد بلاغات مرتبطة بحسابك بعد." : "No reports linked to your account yet."}
+                  {hiddenPendingCount > 0 && (
+                    <div className="mt-4 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllPending((current) => !current)}
+                        className="min-h-10 rounded-full px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-expanded={showAllPending}
+                      >
+                        {showAllPending
+                          ? copy(lang, { ar: "عرض أقل", en: "Show less", ur: "کم دکھائیں" })
+                          : copy(lang, {
+                              ar: `عرض ${hiddenPendingCount} مطابقة أخرى`,
+                              en: `Show ${hiddenPendingCount} more ${hiddenPendingCount === 1 ? "match" : "matches"}`,
+                              ur: `${hiddenPendingCount} مزید میچ دکھائیں`,
+                            })}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {myRecent.map((r) => (
-                    <Link
-                      key={r.id}
-                      to={`/match/${r.id}`}
-                      className="p-5 rounded-2xl bg-card border border-border hover:border-primary/40 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-primary">
-                          {r.type === 0 ? t("lost") : t("found")}
-                        </span>
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                          {t(reportStatusLabelKey(r.status))}
-                        </span>
-                      </div>
-                      <p className="text-sm line-clamp-2">{(r.description ?? "").split(" — ").pop()}</p>
-                    </Link>
+                <EmptyState
+                  title={copy(lang, { ar: "لا يوجد شيء يحتاج قرارك الآن", en: "You're all caught up", ur: "فی الحال کوئی فیصلہ باقی نہیں" })}
+                  text={copy(lang, {
+                    ar: "أي مطابقة سابقة ستظل ظاهرة في قسم المطابقات الأخيرة أدناه.",
+                    en: "Any previous match still remains visible in Recent Matches below.",
+                    ur: "پچھلے میچز نیچے Recent Matches میں نظر آتے رہیں گے۔",
+                  })}
+                />
+              )}
+            </WorkflowSection>
+
+            <WorkflowSection
+              kicker={copy(lang, { ar: "قيد المتابعة", en: "In progress", ur: "جاری" })}
+              tone="active"
+              title={copy(lang, { ar: "البلاغات النشطة", en: "Active reports", ur: "فعال رپورٹس" })}
+              description={copy(lang, {
+                ar: "البلاغات المفتوحة أو التي لديها تطابق ولم تُغلق بعد.",
+                en: "Open or matched reports that haven't been closed yet.",
+                ur: "کھلی یا میچ شدہ رپورٹس جو ابھی بند نہیں ہوئیں۔",
+              })}
+            >
+              {activeReports.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {activeReports.map((report) => (
+                    <ActiveReportCard key={report.id} report={report} lang={lang} t={t} />
                   ))}
                 </div>
+              ) : (
+                <EmptyState
+                  title={copy(lang, { ar: "لا توجد بلاغات نشطة", en: "No active reports", ur: "کوئی فعال رپورٹ نہیں" })}
+                  text={copy(lang, { ar: "أنشئ بلاغًا جديدًا عندما تحتاج للمساعدة.", en: "Create a new report whenever you need help.", ur: "ضرورت کے وقت نئی رپورٹ بنائیں۔" })}
+                />
               )}
-            </>
-          )}
-        </div>
+            </WorkflowSection>
 
-        {/* ---------- Matches on my own reports — cross-referenced client-side
-             against real creatorId-verified report ids (MatchAppService has
-             no owner filter server-side). Only ever shows matches touching
-             a report the current user actually created. ---------- */}
-        {profile && myReportIds.size > 0 && (
-          <div className="mb-12">
-            <div className="flex items-center gap-2 mb-5">
-              <Sparkles className="size-4 text-primary" />
-              <h2 className="font-display text-xl font-bold">
-                {lang === "ar" ? "مطابقات تحتاج ردك" : "Matches needing your response"}
-              </h2>
-            </div>
+            <WorkflowSection
+              kicker={copy(lang, { ar: "تم اتخاذ قرار", en: "Decision history", ur: "فیصلہ ہو چکا" })}
+              tone="decided"
+              title={copy(lang, { ar: "المطابقات الأخيرة", en: "Recent matches", ur: "حالیہ میچز" })}
+              description={copy(lang, {
+                ar: "المطابقات التي سبق واتخذت قرارًا بشأنها.",
+                en: "Matches you have already accepted or rejected.",
+                ur: "وہ میچز جن کے بارے میں آپ پہلے فیصلہ کر چکے ہیں۔",
+              })}
+            >
+              {decidedMatches.length > 0 ? (
+                <div className="border-y border-border">
+                  {decidedMatches.map((match, index) => (
+                    <DecisionMatchRow
+                      key={match.id}
+                      match={match}
+                      href={
+                        otherReportId(match) && ownedReportId(match)
+                          ? `/match/${otherReportId(match)}?from=${ownedReportId(match)}`
+                          : "#"
+                      }
+                      lang={lang}
+                      t={t}
+                      last={index === decidedMatches.length - 1}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title={copy(lang, { ar: "لا توجد مطابقات محسومة بعد", en: "No decided matches yet", ur: "ابھی کوئی فیصلہ شدہ میچ نہیں" })}
+                  text={copy(lang, {
+                    ar: "بعد قبول أو رفض أي مطابقة، ستظهر هنا بدلًا من قسم تحتاج انتباهك.",
+                    en: "After you accept or reject a match, it will appear here instead of Needs your attention.",
+                    ur: "کسی میچ کو قبول یا مسترد کرنے کے بعد وہ توجہ والے حصے کے بجائے یہاں نظر آئے گا۔",
+                  })}
+                />
+              )}
 
-            {loadingMatches ? (
-              <div className="flex items-center gap-2 text-muted-foreground py-6">
-                <Loader2 className="size-4 animate-spin" />
-                {lang === "ar" ? "جارٍ التحميل..." : "Loading..."}
-              </div>
-            ) : myMatches.length === 0 ? (
-              <div className="p-6 rounded-2xl border border-border bg-card text-sm text-muted-foreground">
-                {lang === "ar"
-                  ? "لا توجد مطابقات تنتظر ردك حاليًا."
-                  : "No matches waiting on your response right now."}
-              </div>
-            ) : (
-              <div className="grid sm:grid-cols-2 gap-4">
-                {myMatches.map((m) => {
-                  // Always link to the *other* report in the pair — the one
-                  // the user hasn't seen yet — never their own report id.
-                  const otherReportId = myReportIds.has(m.lostReportId) ? m.foundReportId : m.lostReportId;
-                  return (
-                    <Link
-                      key={m.id}
-                      to={`/match/${otherReportId}`}
-                      className="group flex items-center justify-between gap-4 p-5 rounded-2xl bg-card border border-border hover:border-primary/40 hover:-translate-y-0.5 transition-all"
-                    >
-                      <div className="min-w-0">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-primary">
-                          {lang === "ar" ? "احتمال تطابق" : "Possible match"}
-                        </span>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {lang === "ar" ? "افتح البلاغ لمعرفة إن كان يخصّك." : "Open the report to see if it's yours."}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        {typeof m.similarityScore === "number" && (
-                          <span className="text-sm font-bold font-mono text-primary">
-                            {Math.round(m.similarityScore)}%
-                          </span>
-                        )}
-                        <span className="grid size-8 place-items-center rounded-full bg-primary/5 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                          <ArrowRight className={`size-4 ${lang === "ar" ? "rotate-180" : ""}`} />
-                        </span>
-                      </div>
-                    </Link>
-                  );
+              {matchWindowPartial && (
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  {copy(lang, {
+                    ar: "ملاحظة: واجهة المطابقات لا تدعم التصفية حسب المستخدم أو البلاغ، لذلك هذه الواجهة تربط أحدث النتائج ببلاغاتك في المتصفح. المطابقات الأقدم من نافذة النتائج الحالية قد لا تظهر.",
+                    en: "Note: the matches endpoint has no report/owner filter, so this view cross-references the newest returned window in the browser. Older matches outside that window may not appear.",
+                    ur: "نوٹ: matches endpoint میں رپورٹ/مالک فلٹر نہیں ہے، اس لیے یہ ویو تازہ ترین نتائج کو براؤزر میں آپ کی رپورٹس سے ملاتا ہے۔ پرانے میچز موجودہ ونڈو سے باہر ہو سکتے ہیں۔",
+                  })}
+                </p>
+              )}
+            </WorkflowSection>
+
+            {resolvedReports.length > 0 && (
+              <WorkflowSection
+                kicker={copy(lang, { ar: "مكتمل", en: "Completed", ur: "مکمل" })}
+                tone="resolved"
+                title={copy(lang, { ar: "البلاغات المغلقة", en: "Resolved reports", ur: "حل شدہ رپورٹس" })}
+                description={copy(lang, {
+                  ar: "بلاغات انتهت رحلتها ولم تعد تحتاج إجراءً.",
+                  en: "Reports whose workflow is complete and no longer needs action.",
+                  ur: "وہ رپورٹس جن کا عمل مکمل ہو چکا ہے اور مزید کارروائی درکار نہیں۔",
                 })}
-              </div>
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {resolvedReports.map((report) => (
+                    <ArchivedReportCard key={report.id} report={report} lang={lang} t={t} />
+                  ))}
+                </div>
+              </WorkflowSection>
             )}
-          </div>
+
+
+          </>
         )}
-
-        {/* ---------- Quick actions — real navigation only, no fabricated
-             metrics to fill space when a user's history is still thin. ---------- */}
-        <div>
-          <div className="flex items-center gap-2 mb-5">
-            <Compass className="size-4 text-primary" />
-            <h2 className="font-display text-xl font-bold">
-              {lang === "ar" ? "إجراءات سريعة" : "Quick actions"}
-            </h2>
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-4">
-            <Link
-              to="/report"
-              className="group p-6 rounded-2xl bg-card border border-border hover:border-primary/40 transition-colors"
-            >
-              <PlusCircle className="size-5 text-primary mb-3" />
-              <div className="font-semibold mb-1 group-hover:text-primary transition-colors">
-                {lang === "ar" ? "إنشاء بلاغ جديد" : "Create a new report"}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {lang === "ar" ? "عن مفقود أو موجود." : "For something lost or found."}
-              </p>
-            </Link>
-
-            <Link
-              to="/search"
-              className="group p-6 rounded-2xl bg-card border border-border hover:border-primary/40 transition-colors"
-            >
-              <Sparkles className="size-5 text-primary mb-3" />
-              <div className="font-semibold mb-1 group-hover:text-primary transition-colors">
-                {lang === "ar" ? "بحث ذكي" : "Smart search"}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {lang === "ar" ? "ابحث بالوصف عن مطابقات محتملة." : "Search existing reports by description."}
-              </p>
-            </Link>
-
-            <Link
-              to="/browse"
-              className="group p-6 rounded-2xl bg-card border border-border hover:border-primary/40 transition-colors"
-            >
-              <Search className="size-5 text-primary mb-3" />
-              <div className="font-semibold mb-1 group-hover:text-primary transition-colors">
-                {lang === "ar" ? "تصفح البلاغات" : "Browse reports"}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {lang === "ar" ? "استعرض كل البلاغات المتاحة." : "See everything reported so far."}
-              </p>
-            </Link>
-          </div>
-        </div>
       </div>
     </section>
+  );
+}
+
+function SummaryItem({ label, value, highlight = false }) {
+  return (
+    <div className="bg-card p-5 sm:p-6">
+      <p className={`text-[11px] font-mono uppercase tracking-widest ${highlight ? "text-warn" : "text-muted-foreground"}`}>{label}</p>
+      <p className="mt-2 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{value}</p>
+    </div>
+  );
+}
+
+function WorkflowSection({ kicker, tone = "active", title, description, children }) {
+  const toneStyles = {
+    attention: {
+      rail: "bg-warn",
+      kicker: "text-warn",
+    },
+    active: {
+      rail: "bg-primary",
+      kicker: "text-primary",
+    },
+    decided: {
+      rail: "bg-success",
+      kicker: "text-success",
+    },
+    resolved: {
+      rail: "bg-muted-foreground/45",
+      kicker: "text-muted-foreground",
+    },
+  };
+
+  const styles = toneStyles[tone] ?? toneStyles.active;
+
+  return (
+    <section className="border-t border-border py-8 first:border-t-0 sm:py-10">
+      <div className="mb-5 flex items-start gap-3 sm:gap-4">
+        <span className={`mt-1 h-11 w-1 shrink-0 rounded-full ${styles.rail}`} />
+        <div>
+          <p className={`text-[10px] font-bold tracking-[0.14em] ${styles.kicker}`}>
+            {kicker}
+          </p>
+          <h2 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">
+            {title}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
+        </div>
+      </div>
+
+      {children}
+    </section>
+  );
+}
+
+function ActiveReportCard({ report, lang, t }) {
+  const isLost = report.type === ReportType.LOST;
+
+  return (
+    <Link
+      to={`/match/${report.id}`}
+      className="group relative overflow-hidden rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-soft sm:p-5"
+    >
+      <span
+        className={`absolute inset-y-0 start-0 w-1 ${
+          isLost ? "bg-warn/70" : "bg-success/70"
+        }`}
+      />
+
+      <div className="flex items-center justify-between gap-3">
+        <span
+          className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${
+            isLost
+              ? "bg-warn-tint text-warn"
+              : "bg-success-tint text-success"
+          }`}
+        >
+          {isLost ? t("lost") : t("found")}
+        </span>
+
+        <span className="text-[11px] font-medium text-muted-foreground">
+          {t(reportStatusLabelKey(report.status))}
+        </span>
+      </div>
+
+      <p className="mt-4 line-clamp-2 min-h-10 text-sm font-semibold leading-relaxed sm:text-[15px]">
+        {reportTitle(report, t("browseTitle"))}
+      </p>
+
+      <p className="mt-3 text-xs text-muted-foreground">
+        {formatDate(report.creationTime, lang)}
+      </p>
+    </Link>
+  );
+}
+
+function ArchivedReportCard({ report, lang, t }) {
+  const isLost = report.type === ReportType.LOST;
+
+  return (
+    <Link
+      to={`/match/${report.id}`}
+      className="group rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-4 transition-colors hover:bg-muted/35 sm:px-5"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] font-bold text-muted-foreground">
+          {isLost ? t("lost") : t("found")}
+        </span>
+        <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
+          {t(reportStatusLabelKey(report.status))}
+        </span>
+      </div>
+
+      <p className="mt-3 truncate text-sm font-semibold text-foreground/75">
+        {reportTitle(report, t("browseTitle"))}
+      </p>
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        {formatDate(report.creationTime, lang)}
+      </p>
+    </Link>
+  );
+}
+
+function PendingMatchCard({ match, ownerReport, href, lang, t }) {
+  const score =
+    match.similarityScore != null
+      ? Math.round(Number(match.similarityScore))
+      : null;
+
+  const ownerTitle = ownerReport
+    ? reportTitle(ownerReport, t("browseTitle"))
+    : copy(lang, {
+        ar: "بلاغك",
+        en: "Your report",
+        ur: "آپ کی رپورٹ",
+      });
+
+  const ownerIsLost = ownerReport?.type === ReportType.LOST;
+
+  return (
+    <Link
+      to={href}
+      className="group relative overflow-hidden rounded-2xl border border-warn/20 bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-warn/35 hover:shadow-soft sm:p-5"
+    >
+      <span className="absolute inset-y-0 start-0 w-1 bg-warn/75" />
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex rounded-full bg-warn-tint px-2.5 py-1 text-[10px] font-bold text-warn">
+              {t(matchStatusLabelKey(match.status))}
+            </span>
+
+            {ownerReport && (
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                  ownerIsLost
+                    ? "bg-warn-tint/70 text-warn"
+                    : "bg-success-tint text-success"
+                }`}
+              >
+                {ownerIsLost ? t("lost") : t("found")}
+              </span>
+            )}
+          </div>
+
+          <p className="mt-3 text-[10px] font-bold tracking-[0.12em] text-muted-foreground">
+            {copy(lang, {
+              ar: "يخص بلاغك",
+              en: "For your report",
+              ur: "آپ کی رپورٹ کے لیے",
+            })}
+          </p>
+
+          <h3 className="mt-1 line-clamp-1 font-display text-base font-bold text-foreground transition-colors group-hover:text-primary sm:text-lg">
+            {ownerTitle}
+          </h3>
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              {copy(lang, {
+                ar: "مطابقة محتملة تحتاج قرارك",
+                en: "Potential match needs your decision",
+                ur: "ممکنہ میچ آپ کے فیصلے کا منتظر ہے",
+              })}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>{formatDate(match.creationTime, lang)}</span>
+          </div>
+        </div>
+
+        {score != null && (
+          <div className="shrink-0 rounded-2xl bg-primary/[0.07] px-3.5 py-2.5 text-center text-primary">
+            <p className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+              {score}%
+            </p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">
+              {copy(lang, { ar: "ثقة", en: "confidence", ur: "اعتماد" })}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 border-t border-border/80 pt-3 text-xs font-semibold text-primary">
+        {copy(lang, {
+          ar: "مراجعة المطابقة",
+          en: "Review match",
+          ur: "میچ کا جائزہ لیں",
+        })}
+      </div>
+    </Link>
+  );
+}
+
+function DecisionMatchRow({ match, href, lang, t, last = false }) {
+  const score =
+    match.similarityScore != null
+      ? Math.round(Number(match.similarityScore))
+      : null;
+
+  const accepted = match.status === MatchStatus.ACCEPTED;
+  const statusTone = accepted
+    ? "bg-success-tint text-success"
+    : "bg-error-tint text-error";
+
+  return (
+    <Link
+      to={href}
+      className={`group flex min-h-[70px] items-center gap-4 px-1 py-3.5 transition-colors hover:bg-primary/[0.02] sm:px-3 ${
+        last ? "" : "border-b border-border"
+      }`}
+    >
+      <span
+        className={`size-2.5 shrink-0 rounded-full ${
+          accepted ? "bg-success" : "bg-error"
+        }`}
+      />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold">
+            {copy(lang, {
+              ar: accepted ? "مطابقة تم قبولها" : "مطابقة تم رفضها",
+              en: accepted ? "Accepted match" : "Rejected match",
+              ur: accepted ? "منظور شدہ میچ" : "مسترد شدہ میچ",
+            })}
+          </p>
+
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusTone}`}>
+            {t(matchStatusLabelKey(match.status))}
+          </span>
+        </div>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          {formatDate(match.creationTime, lang)}
+        </p>
+      </div>
+
+      {score != null && (
+        <p className="shrink-0 font-display text-lg font-bold text-primary sm:text-xl">
+          {score}%
+        </p>
+      )}
+    </Link>
+  );
+}
+
+function LoadingState({ text, compact = false }) {
+  return (
+    <div className={`flex items-center gap-2 text-sm text-muted-foreground ${compact ? "py-5" : "justify-center py-20"}`}>
+      <Loader2 className="size-4 animate-spin" />
+      {text}
+    </div>
+  );
+}
+
+function ErrorState({ text, compact = false }) {
+  return (
+    <div className={`flex items-center gap-2.5 rounded-2xl bg-error-tint px-4 py-3 text-sm text-error ${compact ? "" : "mb-10"}`}>
+      <AlertCircle className="size-4 shrink-0" />
+      {text}
+    </div>
+  );
+}
+
+function EmptyState({ title, text }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-card px-5 py-5">
+      <p className="text-sm font-semibold">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{text}</p>
+    </div>
   );
 }

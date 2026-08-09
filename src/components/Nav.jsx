@@ -1,36 +1,39 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useI18n } from "../lib/useI18n";
 import { useTheme } from "../lib/useTheme";
 import { useAuth } from "../lib/useAuth";
-import { Sparkles, Sun, Moon, User, LogOut, LayoutDashboard, ChevronDown } from "lucide-react";
+import { Sparkles, Sun, Moon, User, LogOut, LayoutDashboard, ChevronDown, Menu } from "lucide-react";
 import Logo from "./Logo";
 import NotificationBell from "./NotificationBell";
 import LanguageSwitcher from "./LanguageSwitcher";
+import MobileMenu from "./MobileMenu";
 
 export default function Nav() {
   const { t } = useI18n();
   const { theme, toggleTheme } = useTheme();
   const { profile, logout } = useAuth();
   const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileMenuTriggerRef = useRef(null);
 
   function handleAccountClick() {
     if (profile) {
+      navigate("/", { replace: true });
       logout();
-      navigate("/");
     }
   }
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-background/75 backdrop-blur-xl border-b border-border">
-      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="group flex items-baseline gap-2.5">
             <Logo
               tone={theme === "dark" ? "night" : "default"}
               wordmark
-              className="size-7"
-              wordmarkClassName="text-2xl"
+              className="size-6 sm:size-7"
+              wordmarkClassName="text-xl sm:text-2xl"
             />
 
             <span className="font-body text-sm font-medium tracking-tight text-foreground/40 group-hover:text-foreground/70 transition-colors">
@@ -73,16 +76,18 @@ export default function Nav() {
               {t("navSearch")}
             </NavLink>
 
-            <NavLink
-              to="/browse"
-              className={({ isActive }) =>
-                isActive
-                  ? "text-primary"
-                  : "text-foreground/70 hover:text-primary transition-colors"
-              }
-            >
-              {t("navBrowse")}
-            </NavLink>
+            {profile && (
+              <NavLink
+                to="/browse"
+                className={({ isActive }) =>
+                  isActive
+                    ? "text-primary"
+                    : "text-foreground/70 hover:text-primary transition-colors"
+                }
+              >
+                {t("navBrowse")}
+              </NavLink>
+            )}
 
             {profile && (
               <NavLink
@@ -99,27 +104,48 @@ export default function Nav() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
           <button
-            onClick={toggleTheme}
-            aria-label={t("navToggleTheme")}
-            className="size-10 rounded-full border border-border grid place-items-center hover:bg-stone-100 transition-colors overflow-hidden relative"
-          >
-            <Sun
-              className={`size-4 absolute transition-all duration-500 ${
-                theme === "dark"
-                  ? "opacity-0 -rotate-90 scale-50"
-                  : "opacity-100 rotate-0 scale-100 text-accent-foreground"
-              }`}
-            />
-            <Moon
-              className={`size-4 absolute transition-all duration-500 ${
-                theme === "dark"
-                  ? "opacity-100 rotate-0 scale-100 text-primary"
-                  : "opacity-0 rotate-90 scale-50"
-              }`}
-            />
-          </button>
+  onClick={toggleTheme}
+  aria-label={t("navToggleTheme")}
+  className="
+    hidden md:grid
+    size-10
+    rounded-full
+    border border-border
+    bg-transparent
+    place-items-center
+    overflow-hidden
+    relative
+
+    transition-all duration-300
+
+    hover:bg-stone-100
+    hover:border-primary/20
+
+    focus-visible:outline-none
+    focus-visible:ring-2
+    focus-visible:ring-primary/20
+  "
+>
+  <Sun
+    className={`size-4 absolute transition-all duration-500 ${
+      theme === "dark"
+        ? "opacity-0 -rotate-90 scale-50"
+        : "opacity-100 rotate-0 scale-100 text-amber-500"
+    }`}
+    strokeWidth={2}
+  />
+
+  <Moon
+    className={`size-4 absolute transition-all duration-500 ${
+      theme === "dark"
+        ? "opacity-100 rotate-0 scale-100 text-primary"
+        : "opacity-0 rotate-90 scale-50"
+    }`}
+    strokeWidth={1.8}
+  />
+</button>
 
           <LanguageSwitcher />
 
@@ -131,7 +157,7 @@ export default function Nav() {
             <Link
               to="/auth/login"
               aria-label={t("navLogin")}
-              className="hidden sm:grid size-10 rounded-full border border-border place-items-center hover:bg-stone-100 transition-colors"
+              className="hidden md:grid size-10 rounded-full border border-border place-items-center hover:bg-stone-100 transition-colors"
             >
               <User className="size-4 text-foreground/70" />
             </Link>
@@ -139,13 +165,36 @@ export default function Nav() {
 
           <Link
             to="/report"
-            className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-semibold hover:opacity-90 transition-all hover:-translate-y-0.5 shadow-glow"
+            className="hidden md:inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-semibold hover:opacity-90 transition-all hover:-translate-y-0.5 shadow-glow"
           >
             <Sparkles className="size-3.5" />
             {t("ctaStart")}
           </Link>
+
+          <button
+            ref={mobileMenuTriggerRef}
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label={t(mobileOpen ? "navCloseMenu" : "navOpenMenu")}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-menu-panel"
+            className="md:hidden size-11 grid place-items-center rounded-full hover:bg-stone-100 transition-colors"
+          >
+            <Menu className="size-5" />
+          </button>
         </div>
       </div>
+
+      <MobileMenu
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        triggerRef={mobileMenuTriggerRef}
+        profile={profile}
+        onLogout={handleAccountClick}
+        t={t}
+        theme={theme}
+        toggleTheme={toggleTheme}
+      />
     </nav>
   );
 }
@@ -190,7 +239,7 @@ function AccountMenu({ profile, onLogout, t }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={name}
-        className="hidden sm:flex items-center gap-1.5 h-10 ps-1 pe-2.5 rounded-full border border-border hover:border-primary/30 hover:bg-stone-50 transition-colors"
+        className="hidden md:flex items-center gap-1.5 h-10 ps-1 pe-2.5 rounded-full border border-border hover:border-primary/30 hover:bg-stone-50 transition-colors"
       >
         <span className="grid size-8 place-items-center rounded-full bg-primary/10 text-primary text-xs font-bold font-mono">
           {initials(profile)}

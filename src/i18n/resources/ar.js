@@ -55,9 +55,14 @@ export default {
   navHow: "كيف يعمل",
   navFeatures: "المميزات",
   navReport: "بلّغ",
-  navBrowse: "تصفح",
+  navBrowse: "بلاغاتي",
   navDashboard: "لوحة التحكم",
   navToggleTheme: "تبديل المظهر",
+  navOpenMenu: "فتح القائمة",
+  navCloseMenu: "إغلاق القائمة",
+  navMenu: "القائمة",
+  navLightMode: "الوضع الفاتح",
+  navDarkMode: "الوضع الداكن",
   navNotifications: "الإشعارات",
   navLogin: "تسجيل الدخول",
   ctaStart: "ابدأ الآن",
@@ -69,8 +74,9 @@ export default {
   heroSub:
     "نستخدم الذكاء الاصطناعي الدلالي لفهم مفقوداتك وربطها بالبلاغات على الفور — بلا اعتماد على الكلمات المفتاحية.",
   ctaReport: "بلّغ عن مفقود",
-  ctaBrowse: "تصفح البلاغات",
-  heroAiCta: "فقدت شيئًا؟ دع الذكاء الاصطناعي يبحث في البلاغات الموجودة.",
+  ctaBrowse: "بلاغاتي",
+  heroSmartSearchLabel: "البحث الذكي",
+  heroSmartSearchHint: "صف مفقودك، ودع لُقيا تبحث عنه.",
 
   // Semantic demo
   semTitle: "الفهم الدلالي",
@@ -130,16 +136,12 @@ export default {
   uCity: "المدن الذكية",
 
   // Footer
-  footTag: "نعيد تعريف الثقة في العصر الرقمي عبر أنظمة استرداد ذكية. صُنع بفخر لرؤية الغد.",
-  footProduct: "المنتج",
-  footCompany: "الشركة",
-  footRights: "© 2024 لُقيا. الرياض، المملكة العربية السعودية.",
-  footFeatures: "المميزات",
-  footAiLogic: "منطق الذكاء الاصطناعي",
-  footSecurity: "الأمان",
-  footAbout: "عن لُقيا",
-  footLeap: "LEAP",
-  footCareers: "الوظائف",
+  footTag: "لُقيا منصة للمفقودات والموجودات تساعد على ربط البلاغات عبر البحث الدلالي والمطابقة المدعومة بالذكاء الاصطناعي.",
+  footNavigation: "التنقل",
+  footAccount: "الحساب",
+  footLogin: "تسجيل الدخول",
+  footRegister: "إنشاء حساب",
+  footRights: "© {year} لُقيا",
 
   // Report — shared field labels
   reportTitle: "بلّغ عن غرض",
