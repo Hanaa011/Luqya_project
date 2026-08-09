@@ -203,9 +203,7 @@ def extract_item_from_message(message: str) -> dict:
     if not has_meaningful_item_data:
         should_match = False
 
-    # Deterministic safety net: once type, color, and location are all known
-    # there is nothing left to ask for, so proceed regardless of the model's
-    # own should_match judgment (which is not always reliable here).
+
     if item_type and color and location:
         should_match = True
 

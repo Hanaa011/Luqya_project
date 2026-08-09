@@ -66,21 +66,10 @@ COLOR_ALIASES = {
 
 KNOWN_TYPES = set(TYPE_ALIASES.values())
 
-# Measured on text-embedding-3-small: unrelated short item phrases sit
-# around 0.20-0.24 cosine similarity, genuine same-item paraphrases
-# (including cross-language) land around 0.45-0.85+. We linearly stretch
-# that observed band onto a 0-1 evidence scale instead of treating raw
-# cosine similarity as a match percentage.
-SIM_FLOOR = 0.20
+
 SIM_CEIL = 0.55
 
-# Type is the strongest identifying signal, so its status sets the base
-# score everything else builds on: confirmed match, confirmed conflict, or
-# unknown (missing, or an open-vocabulary pair we can't confidently call
-# a conflict). Color/location are structured corroborating evidence;
-# strong description similarity is a softer, continuous signal. Outside
-# a confirmed conflict, none of these ever subtract - missing or
-# non-matching secondary fields simply earn no bonus.
+
 TYPE_MATCH_BASE = 75.0
 TYPE_UNKNOWN_BASE = 40.0
 TYPE_CONFLICT_BASE = 10.0
@@ -184,8 +173,7 @@ def calculate_match_score(
     desc_bonus = desc_similarity * DESC_BONUS_MAX if has_description else 0.0
 
     if type_score == 0.0:
-        # A confirmed type conflict is disqualifying: color/location are
-        # deliberately ignored so a matching color can never rescue it.
+
         score = round(min(TYPE_CONFLICT_BASE + desc_bonus, CONFLICT_CEILING), 2)
     else:
         base = TYPE_MATCH_BASE if type_score == 1.0 else TYPE_UNKNOWN_BASE
