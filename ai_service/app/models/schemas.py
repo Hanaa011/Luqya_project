@@ -22,23 +22,16 @@ class ItemData(BaseModel):
 
 class MatchRequest(BaseModel):
     lost_item: ItemData
-    found_items: list[ItemData] = Field(
-        default_factory=list
-    )
+    found_items: list[ItemData] = Field(default_factory=list)
 
 
 class MatchResult(BaseModel):
     lost_report_id: str | None = None
     found_report_id: str | None = None
-    similarity_score: float = Field(
-        ge=0,
-        le=100,
-    )
+    similarity_score: float = Field(ge=0, le=100)
     match_reason: str
     status: str
 
 
 class MatchResponse(BaseModel):
-    matches: list[MatchResult] = Field(
-        default_factory=list
-    )
+    matches: list[MatchResult] = Field(default_factory=list)

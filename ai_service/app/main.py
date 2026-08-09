@@ -6,21 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as ai_router
 
-
 load_dotenv()
 
 
 def get_allowed_origins() -> list[str]:
-    origins_value = os.getenv(
-        "ALLOWED_ORIGINS",
-        "http://localhost:3000,http://localhost:5173",
-    )
-
-    return [
-        origin.strip()
-        for origin in origins_value.split(",")
-        if origin.strip()
-    ]
+    origins_value = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173")
+    return [origin.strip() for origin in origins_value.split(",") if origin.strip()]
 
 
 app = FastAPI(
@@ -35,29 +26,18 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_origins(),
     allow_credentials=True,
-    allow_methods=[
-        "GET",
-        "POST",
-        "OPTIONS",
-    ],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
-
-app.include_router(
-    ai_router
-)
+app.include_router(ai_router)
 
 
-@app.get(
-    "/",
-    tags=["Service"],
-)
+@app.get("/", tags=["Service"])
 async def root():
     return {
         "service": app.title,
@@ -68,10 +48,7 @@ async def root():
     }
 
 
-@app.get(
-    "/health",
-    tags=["Service"],
-)
+@app.get("/health", tags=["Service"])
 async def health_check():
     return {
         "status": "healthy",
