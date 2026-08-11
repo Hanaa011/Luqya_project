@@ -167,7 +167,7 @@ export default function SmartSearch() {
                 {results.map((r) => (
                   <Link
                     key={r.reportId}
-                    to={`/match/${r.reportId}`}
+                    to={`/match/${r.reportId}?source=smart-search`}
                     className="group rounded-[1.75rem] border border-border bg-card overflow-hidden shadow-soft hover:shadow-luxe hover:-translate-y-1 transition-all"
                   >
                     <div className="aspect-[16/10] bg-gradient-to-br from-stone-100 to-stone-200 relative grid place-items-center">

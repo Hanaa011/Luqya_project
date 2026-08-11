@@ -564,7 +564,7 @@ function MatchesView({ t, matches, sourceReportId }) {
         {matches.map((m) => (
           <Link
             key={m.reportId}
-            to={sourceReportId ? `/match/${m.reportId}?from=${sourceReportId}` : `/match/${m.reportId}`}
+            to={sourceReportId ? `/match/${m.reportId}?from=${sourceReportId}&source=report-form` : `/match/${m.reportId}?source=report-form`}
             className="group rounded-[1.75rem] border border-border bg-card overflow-hidden shadow-soft hover:shadow-luxe hover:-translate-y-1 transition-all"
           >
             <div className="aspect-[16/10] bg-gradient-to-br from-stone-100 to-stone-200 relative grid place-items-center">

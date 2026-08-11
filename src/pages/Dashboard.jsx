@@ -25,11 +25,6 @@ function formatDate(value, lang) {
   return new Date(value).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" });
 }
 
-function matchScoreValue(match) {
-  const value = Number(match?.similarityScore);
-  return Number.isFinite(value) ? value : -1;
-}
-
 export default function Dashboard() {
   const { t, lang } = useI18n();
   const { userId } = useAuth();
@@ -149,52 +144,13 @@ export default function Dashboard() {
     () => reports.filter((report) => report.status === ReportStatus.CLOSED).slice(0, 4),
     [reports]
   );
-  const acceptedOwnedReportIds = useMemo(() => {
-    const acceptedIds = new Set();
-
-    matches.forEach((match) => {
-      if (match.status !== MatchStatus.ACCEPTED) return;
-
-      if (myReportIds.has(match.lostReportId)) {
-        acceptedIds.add(match.lostReportId);
-      }
-
-      if (myReportIds.has(match.foundReportId)) {
-        acceptedIds.add(match.foundReportId);
-      }
-    });
-
-    return acceptedIds;
-  }, [matches, myReportIds]);
-
   const pendingMatches = useMemo(
-    () =>
-      matches
-        .filter((match) => match.status === MatchStatus.PENDING)
-        .filter((match) => {
-          const ownedId = myReportIds.has(match.lostReportId)
-            ? match.lostReportId
-            : myReportIds.has(match.foundReportId)
-              ? match.foundReportId
-              : null;
-
-          return !ownedId || !acceptedOwnedReportIds.has(ownedId);
-        })
-        .sort((a, b) => {
-          const scoreDifference = matchScoreValue(b) - matchScoreValue(a);
-          if (scoreDifference !== 0) return scoreDifference;
-
-          return new Date(b.creationTime ?? 0).getTime() - new Date(a.creationTime ?? 0).getTime();
-        }),
-    [acceptedOwnedReportIds, matches, myReportIds]
+    () => matches.filter((match) => match.status === MatchStatus.PENDING).slice(0, 6),
+    [matches]
   );
   const decidedMatches = useMemo(
     () => matches.filter((match) => match.status !== MatchStatus.PENDING).slice(0, 6),
     [matches]
-  );
-  const reportsById = useMemo(
-    () => new Map(reports.map((report) => [report.id, report])),
-    [reports]
   );
   const visiblePendingMatches = showAllPending ? pendingMatches : pendingMatches.slice(0, 2);
   const hiddenPendingCount = Math.max(0, pendingMatches.length - 2);
@@ -203,24 +159,16 @@ export default function Dashboard() {
     () => ({
       total: reports.length,
       active: reports.filter((report) => report.status !== ReportStatus.CLOSED).length,
-      attention: pendingMatches.length,
+      attention: matches.filter((match) => match.status === MatchStatus.PENDING).length,
       resolved: reports.filter((report) => report.status === ReportStatus.CLOSED).length,
     }),
-    [pendingMatches, reports]
+    [matches, reports]
   );
 
 
 
-  function ownedReportId(match) {
-    if (myReportIds.has(match.lostReportId)) return match.lostReportId;
-    if (myReportIds.has(match.foundReportId)) return match.foundReportId;
-    return null;
-  }
-
   function otherReportId(match) {
-    const mine = ownedReportId(match);
-    if (!mine) return null;
-    return mine === match.lostReportId ? match.foundReportId : match.lostReportId;
+    return myReportIds.has(match.lostReportId) ? match.foundReportId : match.lostReportId;
   }
 
   return (
@@ -270,9 +218,9 @@ export default function Dashboard() {
               tone="attention"
               title={copy(lang, { ar: "تحتاج انتباهك", en: "Needs your attention", ur: "آپ کی توجہ درکار" })}
               description={copy(lang, {
-                ar: "مطابقات بانتظار قرارك، مرتبة من أعلى نسبة إلى الأقل.",
-                en: "Matches waiting for your decision, strongest first.",
-                ur: "آپ کے فیصلے کے منتظر میچز، زیادہ اسکور سے کم اسکور تک۔",
+                ar: "مطابقات بانتظار قرارك.",
+                en: "Matches waiting for your decision.",
+                ur: "وہ میچز جو آپ کے فیصلے کے منتظر ہیں۔",
               })}
             >
               {loadingMatches ? (
@@ -282,26 +230,15 @@ export default function Dashboard() {
               ) : pendingMatches.length > 0 ? (
                 <div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    {visiblePendingMatches.map((match) => {
-                      const mineId = ownedReportId(match);
-                      const candidateId = otherReportId(match);
-                      const ownerReport = mineId ? reportsById.get(mineId) : null;
-
-                      return (
-                        <PendingMatchCard
-                          key={match.id}
-                          match={match}
-                          ownerReport={ownerReport}
-                          href={
-                            candidateId && mineId
-                              ? `/match/${candidateId}?from=${mineId}`
-                              : "#"
-                          }
-                          lang={lang}
-                          t={t}
-                        />
-                      );
-                    })}
+                    {visiblePendingMatches.map((match) => (
+                      <PendingMatchCard
+                        key={match.id}
+                        match={match}
+                        href={`/match/${otherReportId(match)}`}
+                        lang={lang}
+                        t={t}
+                      />
+                    ))}
                   </div>
 
                   {hiddenPendingCount > 0 && (
@@ -375,11 +312,7 @@ export default function Dashboard() {
                     <DecisionMatchRow
                       key={match.id}
                       match={match}
-                      href={
-                        otherReportId(match) && ownedReportId(match)
-                          ? `/match/${otherReportId(match)}?from=${ownedReportId(match)}`
-                          : "#"
-                      }
+                      href={`/match/${otherReportId(match)}`}
                       lang={lang}
                       t={t}
                       last={index === decidedMatches.length - 1}
@@ -557,77 +490,41 @@ function ArchivedReportCard({ report, lang, t }) {
   );
 }
 
-function PendingMatchCard({ match, ownerReport, href, lang, t }) {
+function PendingMatchCard({ match, href, lang, t }) {
   const score =
     match.similarityScore != null
       ? Math.round(Number(match.similarityScore))
       : null;
 
-  const ownerTitle = ownerReport
-    ? reportTitle(ownerReport, t("browseTitle"))
-    : copy(lang, {
-        ar: "بلاغك",
-        en: "Your report",
-        ur: "آپ کی رپورٹ",
-      });
-
-  const ownerIsLost = ownerReport?.type === ReportType.LOST;
-
   return (
     <Link
       to={href}
-      className="group relative overflow-hidden rounded-2xl border border-warn/20 bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-warn/35 hover:shadow-soft sm:p-5"
+      className="group relative overflow-hidden rounded-2xl border border-warn/20 bg-warn-tint/[0.12] p-4 transition-all hover:-translate-y-0.5 hover:border-warn/35 hover:shadow-soft sm:p-5"
     >
       <span className="absolute inset-y-0 start-0 w-1 bg-warn/75" />
 
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex rounded-full bg-warn-tint px-2.5 py-1 text-[10px] font-bold text-warn">
-              {t(matchStatusLabelKey(match.status))}
-            </span>
+        <div className="min-w-0">
+          <span className="inline-flex rounded-full bg-warn-tint px-2.5 py-1 text-[10px] font-bold text-warn">
+            {t(matchStatusLabelKey(match.status))}
+          </span>
 
-            {ownerReport && (
-              <span
-                className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                  ownerIsLost
-                    ? "bg-warn-tint/70 text-warn"
-                    : "bg-success-tint text-success"
-                }`}
-              >
-                {ownerIsLost ? t("lost") : t("found")}
-              </span>
-            )}
-          </div>
-
-          <p className="mt-3 text-[10px] font-bold tracking-[0.12em] text-muted-foreground">
+          <p className="mt-3 text-sm font-semibold sm:text-[15px]">
             {copy(lang, {
-              ar: "يخص بلاغك",
-              en: "For your report",
-              ur: "آپ کی رپورٹ کے لیے",
+              ar: "مطابقة محتملة تحتاج قرارك",
+              en: "Potential match needs your decision",
+              ur: "ممکنہ میچ آپ کے فیصلے کا منتظر ہے",
             })}
           </p>
 
-          <h3 className="mt-1 line-clamp-1 font-display text-base font-bold text-foreground transition-colors group-hover:text-primary sm:text-lg">
-            {ownerTitle}
-          </h3>
-
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span>
-              {copy(lang, {
-                ar: "مطابقة محتملة تحتاج قرارك",
-                en: "Potential match needs your decision",
-                ur: "ممکنہ میچ آپ کے فیصلے کا منتظر ہے",
-              })}
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>{formatDate(match.creationTime, lang)}</span>
-          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {formatDate(match.creationTime, lang)}
+          </p>
         </div>
 
         {score != null && (
-          <div className="shrink-0 rounded-2xl bg-primary/[0.07] px-3.5 py-2.5 text-center text-primary">
-            <p className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+          <div className="shrink-0 text-end">
+            <p className="font-display text-2xl font-extrabold tracking-tight text-primary sm:text-3xl">
               {score}%
             </p>
             <p className="mt-0.5 text-[10px] text-muted-foreground">
@@ -635,14 +532,6 @@ function PendingMatchCard({ match, ownerReport, href, lang, t }) {
             </p>
           </div>
         )}
-      </div>
-
-      <div className="mt-4 border-t border-border/80 pt-3 text-xs font-semibold text-primary">
-        {copy(lang, {
-          ar: "مراجعة المطابقة",
-          en: "Review match",
-          ur: "میچ کا جائزہ لیں",
-        })}
       </div>
     </Link>
   );
