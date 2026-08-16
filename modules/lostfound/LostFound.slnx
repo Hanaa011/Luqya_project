@@ -1,0 +1,20 @@
+<Solution>
+
+    <Folder Name="/src/">
+        <Project Path="src/LostFound.Application.Contracts/LostFound.Application.Contracts.csproj" />
+        <Project Path="src/LostFound.Application/LostFound.Application.csproj" />
+        <Project Path="src/LostFound.Domain.Shared/LostFound.Domain.Shared.csproj" />
+        <Project Path="src/LostFound.Domain/LostFound.Domain.csproj" />
+        <Project Path="src/LostFound.EntityFrameworkCore/LostFound.EntityFrameworkCore.csproj" />
+        <Project Path="src/LostFound.HttpApi.Client/LostFound.HttpApi.Client.csproj" />
+        <Project Path="src/LostFound.HttpApi/LostFound.HttpApi.csproj" />
+        <Project Path="src/LostFound.Installer/LostFound.Installer.csproj" />
+    </Folder>
+    
+    <Folder Name="/test/">
+        <Project Path="test/LostFound.Application.Tests/LostFound.Application.Tests.csproj" />
+        <Project Path="test/LostFound.Domain.Tests/LostFound.Domain.Tests.csproj" />
+        <Project Path="test/LostFound.EntityFrameworkCore.Tests/LostFound.EntityFrameworkCore.Tests.csproj" />
+        <Project Path="test/LostFound.TestBase/LostFound.TestBase.csproj" />
+    </Folder>
+</Solution>

@@ -1,0 +1,55 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "cli": {
+    "analytics": false
+  },
+  "version": 1,
+  "newProjectRoot": "projects",
+  "projects": {
+    "dev-app": {
+      "projectType": "application",
+      "root": "projects/dev-app",
+      "sourceRoot": "projects/dev-app/src"
+    },
+    "lost-found": {
+      "projectType": "library",
+      "root": "projects/lost-found",
+      "sourceRoot": "projects/lost-found/src",
+      "prefix": "lib",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:ng-packagr",
+          "options": {
+            "project": "projects/lost-found/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/lost-found/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "projects/lost-found/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/lost-found/tsconfig.spec.json",
+            "buildTarget": "projects/lost-found:build",
+            "runner": "vitest"
+          }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "projects/lost-found/**/*.ts",
+              "projects/lost-found/**/*.html"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

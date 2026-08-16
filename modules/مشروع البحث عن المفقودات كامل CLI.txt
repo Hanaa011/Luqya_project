@@ -1,0 +1,4958 @@
+$ErrorActionPreference = "Stop"
+
+# ==========================================================================
+# LostFound module generator - ABP 10.4.1 / .NET 10 (PowerShell)
+# AI (embeddings + classification) is merged INTO LostFound.Application -
+# there is NO separate LostFound.AI project/module.
+# Run this from the folder that contains the LostFound.* project folders.
+# ==========================================================================
+
+New-Item -ItemType Directory -Force ".\LostFound.Application" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\AI" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\AI\Dtos" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Analytics" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Analytics\Dtos" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Categories" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Categories\Dtos" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Locations" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Locations\Dtos" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Matches" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Matches\Dtos" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Notifications" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Notifications\Dtos" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Products" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Products\Dtos" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Reporters" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Reporters\Dtos" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Reports" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application.Contracts\Reports\Dtos" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\AI" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\AI\Providers" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\Analytics" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\BackgroundJobs" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\Categories" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\Locations" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\Matches" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\Notifications" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\Products" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\Reporters" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Application\Reports" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain.Shared" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain.Shared\Categories" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain.Shared\Locations" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain.Shared\Matches" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain.Shared\Notifications" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain.Shared\Products" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain.Shared\Reporters" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain.Shared\Reports" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain\Categories" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain\Locations" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain\Matches" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain\Matching" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain\Notifications" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain\Products" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain\Reporters" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.Domain\Reports" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.EntityFrameworkCore" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.EntityFrameworkCore\EntityFrameworkCore" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Categories" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Locations" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Matches" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Notifications" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Products" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Reporters" | Out-Null
+New-Item -ItemType Directory -Force ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Reports" | Out-Null
+
+Write-Host "Directory structure created." -ForegroundColor Green
+
+Set-Content -Path ".\LostFound.Application.Contracts\AI\Dtos\AiSearchInputDto.cs" -Value @'
+using LostFound.Reports;
+
+namespace LostFound.AI.Dtos
+{
+    public class AiSearchInputDto
+    {
+        // At least one of Text / ImageBase64 must be provided - validated
+        // in AiSearchAppService.
+        public string? Text { get; set; }
+
+        // Base64-encoded image bytes for image-based search.
+        public string? ImageBase64 { get; set; }
+
+        // Usually the OPPOSITE of what the user lost/found.
+        public ReportType? Type { get; set; }
+
+        public int MaxResults { get; set; } = 10;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\AI\Dtos\AiSearchResultDto.cs" -Value @'
+using System;
+
+namespace LostFound.AI.Dtos
+{
+    public class AiSearchResultDto
+    {
+        public Guid ReportId { get; set; }
+        public string? Description { get; set; }
+        public string? Color { get; set; }
+        public string? AiObjectType { get; set; }
+        public double ScorePercentage { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\AI\IAiMatchingService.cs" -Value @'
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using LostFound.Reports;
+
+namespace LostFound.AI
+{
+    // Real-time semantic search orchestration used by AiSearchAppService
+    // (as opposed to MatchManager, which is the Domain-side batch/
+    // event-driven matching used by the background job).
+    public interface IAiMatchingService
+    {
+        Task<List<RankedReportResult>> FindSimilarReportsAsync(
+            string? searchText,
+            byte[]? imageBytes,
+            ReportType? type,
+            int maxResults = 10);
+    }
+
+    // Plain fields only - Application.Contracts must never reference
+    // LostFound.Domain, so this is NOT the Domain Report entity.
+    public class RankedReportResult
+    {
+        public Guid ReportId { get; set; }
+        public string? Description { get; set; }
+        public string? Color { get; set; }
+        public string? AiObjectType { get; set; }
+        public double ScorePercentage { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\AI\IAiSearchAppService.cs" -Value @'
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Services;
+using LostFound.AI.Dtos;
+
+namespace LostFound.AI
+{
+    // Real-time semantic search ONLY - separate from IReportAppService and
+    // IMatchAppService by design.
+    public interface IAiSearchAppService : IApplicationService
+    {
+        Task<List<AiSearchResultDto>> SearchAsync(AiSearchInputDto input);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\AI\IEmbeddingProvider.cs" -Value @'
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace LostFound.AI
+{
+    // Lives in Application.Contracts (NOT Domain) - the Domain layer stays
+    // 100% free of any AI-related type. Implementations live directly in
+    // LostFound.Application/AI/Providers (merged, no separate AI project).
+    public interface IEmbeddingProvider
+    {
+        string ProviderName { get; }
+
+        Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken cancellationToken = default);
+
+        // Practical approach: rather than requiring a dedicated multimodal/
+        // CLIP-style embedding model, the image is captioned by the same
+        // provider's vision model, then the caption text is embedded with
+        // the method above (caption-then-embed).
+        Task<float[]> GenerateImageEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\AI\IItemClassificationProvider.cs" -Value @'
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace LostFound.AI
+{
+    // The AI-first replacement for manual Category selection. Given a
+    // description and an optional image, returns everything the UI used to
+    // ask the user for, generated automatically instead.
+    public interface IItemClassificationProvider
+    {
+        string ProviderName { get; }
+
+        Task<ItemClassificationResult> ClassifyAsync(
+            string? description,
+            byte[]? imageBytes,
+            CancellationToken cancellationToken = default);
+    }
+
+    public class ItemClassificationResult
+    {
+        // Free-text category NAME (resolved/created via CategoryManager,
+        // never a Guid the AI could not possibly know).
+        public string? CategoryName { get; set; }
+
+        public string? ObjectType { get; set; }
+
+        public string? Color { get; set; }
+
+        public string? Brand { get; set; }
+
+        public System.Collections.Generic.List<string> Tags { get; set; } = new();
+
+        // Used to build the image embedding (caption-then-embed approach).
+        public string? ImageCaption { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Analytics\Dtos\ReportAnalyticsDto.cs" -Value @'
+using System.Collections.Generic;
+
+namespace LostFound.Analytics.Dtos
+{
+    public class ReportAnalyticsDto
+    {
+        public List<NameCountDto> TopCategories { get; set; } = new();
+        public List<NameCountDto> TopObjectTypes { get; set; } = new();
+        public List<NameCountDto> TopColors { get; set; } = new();
+        public List<NameCountDto> TopLocations { get; set; } = new();
+        public List<NameCountDto> TopBrands { get; set; } = new();
+    }
+
+    public class NameCountDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Analytics\IReportAnalyticsAppService.cs" -Value @'
+using System.Threading.Tasks;
+using Volo.Abp.Application.Services;
+using LostFound.Analytics.Dtos;
+
+namespace LostFound.Analytics
+{
+    // Reports/dashboards read AI-GENERATED metadata (Category, ObjectType,
+    // Color, Brand) instead of manually-selected values.
+    public interface IReportAnalyticsAppService : IApplicationService
+    {
+        Task<ReportAnalyticsDto> GetAsync(int topN = 10);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Categories\Dtos\CategoryDto.cs" -Value @'
+using System;
+using Volo.Abp.Application.Dtos;
+
+namespace LostFound.Categories.Dtos
+{
+    public class CategoryDto : AuditedEntityDto<Guid>
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Icon { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Categories\Dtos\CreateUpdateCategoryDto.cs" -Value @'
+using System.ComponentModel.DataAnnotations;
+using LostFound.Categories;
+
+namespace LostFound.Categories.Dtos
+{
+    public class CreateUpdateCategoryDto
+    {
+        [Required]
+        [StringLength(CategoryConsts.MaxNameLength)]
+        public string Name { get; set; } = string.Empty;
+
+        [StringLength(CategoryConsts.MaxIconLength)]
+        public string? Icon { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Categories\ICategoryAppService.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Categories.Dtos;
+
+namespace LostFound.Categories
+{
+    // Manual/admin CRUD only - normal Report creation resolves categories
+    // automatically through CategoryManager instead.
+    public interface ICategoryAppService : IApplicationService
+    {
+        Task<CategoryDto> GetAsync(Guid id);
+        Task<PagedResultDto<CategoryDto>> GetListAsync(PagedAndSortedResultRequestDto input);
+        Task<CategoryDto> CreateAsync(CreateUpdateCategoryDto input);
+        Task<CategoryDto> UpdateAsync(Guid id, CreateUpdateCategoryDto input);
+        Task DeleteAsync(Guid id);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Locations\Dtos\CreateUpdateLocationDto.cs" -Value @'
+using System.ComponentModel.DataAnnotations;
+using LostFound.Locations;
+
+namespace LostFound.Locations.Dtos
+{
+    public class CreateUpdateLocationDto
+    {
+        [Required]
+        [StringLength(LocationConsts.MaxPlaceNameLength)]
+        public string PlaceName { get; set; } = string.Empty;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Locations\Dtos\LocationDto.cs" -Value @'
+using System;
+using Volo.Abp.Application.Dtos;
+
+namespace LostFound.Locations.Dtos
+{
+    public class LocationDto : AuditedEntityDto<Guid>
+    {
+        public string PlaceName { get; set; } = string.Empty;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Locations\ILocationAppService.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Locations.Dtos;
+
+namespace LostFound.Locations
+{
+    public interface ILocationAppService : IApplicationService
+    {
+        Task<LocationDto> GetAsync(Guid id);
+        Task<PagedResultDto<LocationDto>> GetListAsync(PagedAndSortedResultRequestDto input);
+        Task<LocationDto> CreateAsync(CreateUpdateLocationDto input);
+        Task<LocationDto> UpdateAsync(Guid id, CreateUpdateLocationDto input);
+        Task DeleteAsync(Guid id);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Matches\Dtos\MatchDto.cs" -Value @'
+using System;
+using Volo.Abp.Application.Dtos;
+
+namespace LostFound.Matches.Dtos
+{
+    public class MatchDto : AuditedEntityDto<Guid>
+    {
+        public Guid LostReportId { get; set; }
+        public Guid FoundReportId { get; set; }
+        public decimal? SimilarityScore { get; set; }
+        public string? MatchReason { get; set; }
+        public MatchStatus Status { get; set; }
+        public bool IsAutoGenerated { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Matches\IMatchAppService.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Matches.Dtos;
+
+namespace LostFound.Matches
+{
+    // Review of AI-generated matches ONLY - never creates a Report and never
+    // does semantic search itself (see IAiSearchAppService for that).
+    public interface IMatchAppService : IApplicationService
+    {
+        Task<PagedResultDto<MatchDto>> GetListAsync(PagedAndSortedResultRequestDto input);
+        Task<MatchDto> AcceptAsync(Guid id);
+        Task<MatchDto> RejectAsync(Guid id);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Notifications\Dtos\CreateNotificationDto.cs" -Value @'
+using System;
+using System.ComponentModel.DataAnnotations;
+using LostFound.Notifications;
+
+namespace LostFound.Notifications.Dtos
+{
+    public class CreateNotificationDto
+    {
+        [Required]
+        public Guid ReporterId { get; set; }
+
+        [Required]
+        public Guid ReportId { get; set; }
+
+        [StringLength(NotificationConsts.MaxTitleLength)]
+        public string? Title { get; set; }
+
+        public string? Message { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Notifications\Dtos\NotificationDto.cs" -Value @'
+using System;
+using Volo.Abp.Application.Dtos;
+
+namespace LostFound.Notifications.Dtos
+{
+    public class NotificationDto : AuditedEntityDto<Guid>
+    {
+        public Guid ReporterId { get; set; }
+        public Guid ReportId { get; set; }
+        public string? Title { get; set; }
+        public string? Message { get; set; }
+        public bool IsRead { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Notifications\IReporterNotificationAppService.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Notifications.Dtos;
+
+namespace LostFound.Notifications
+{
+    public interface INotificationAppService : IApplicationService
+    {
+        Task<PagedResultDto<NotificationDto>> GetListAsync(Guid reporterId, PagedAndSortedResultRequestDto input);
+        Task<NotificationDto> CreateAsync(CreateNotificationDto input);
+        Task MarkAsReadAsync(Guid id);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Products\Dtos\CreateUpdateProductDto.cs" -Value @'
+using System.ComponentModel.DataAnnotations;
+
+namespace LostFound.Products.Dtos
+{
+    public class CreateUpdateProductDto
+    {
+        [Required]
+        [StringLength(ProductConsts.MaxNameLength, MinimumLength = ProductConsts.MinNameLength)]
+        public string Name { get; set; } = string.Empty;
+
+        [StringLength(ProductConsts.MaxDescriptionLength)]
+        public string? Description { get; set; }
+
+        [Range(0, double.MaxValue)]
+        public decimal Price { get; set; }
+
+        public ProductStatus Status { get; set; } = ProductStatus.Draft;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Products\Dtos\GetProductListDto.cs" -Value @'
+using Volo.Abp.Application.Dtos;
+
+namespace LostFound.Products.Dtos
+{
+    public class GetProductListDto : PagedAndSortedResultRequestDto
+    {
+        public string? Filter { get; set; }
+
+        public ProductStatus? Status { get; set; }
+
+        public decimal? MinPrice { get; set; }
+
+        public decimal? MaxPrice { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Products\Dtos\ProductDownloadTokenResultDto.cs" -Value @'
+namespace LostFound.Products.Dtos
+{
+    // Volo.Abp.Application.Dtos.DownloadTokenResultDto does NOT exist in core
+    // ABP - define our own here.
+    public class ProductDownloadTokenResultDto
+    {
+        public string Token { get; set; } = string.Empty;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Products\Dtos\ProductDto.cs" -Value @'
+using System;
+using Volo.Abp.Application.Dtos;
+
+namespace LostFound.Products.Dtos
+{
+    public class ProductDto : AuditedEntityDto<Guid>
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public decimal Price { get; set; }
+
+        public ProductStatus Status { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Products\Dtos\ProductExcelDownloadDto.cs" -Value @'
+namespace LostFound.Products.Dtos
+{
+    public class ProductExcelDownloadDto
+    {
+        public string DownloadToken { get; set; } = string.Empty;
+
+        public string? Sorting { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Products\Dtos\ProductExcelDto.cs" -Value @'
+using System;
+
+namespace LostFound.Products.Dtos
+{
+    public class ProductExcelDto
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public decimal Price { get; set; }
+
+        public string Status { get; set; } = string.Empty;
+
+        public DateTime CreationTime { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Products\IProductAppService.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Services;
+using Volo.Abp.Content;
+using LostFound.Products.Dtos;
+
+namespace LostFound.Products
+{
+    public interface IProductAppService :
+        ICrudAppService<
+            ProductDto,
+            Guid,
+            GetProductListDto,
+            CreateUpdateProductDto,
+            CreateUpdateProductDto>
+    {
+        Task<IRemoteStreamContent> GetListAsExcelFileAsync(ProductExcelDownloadDto input);
+
+        Task<ProductDownloadTokenResultDto> GetDownloadTokenAsync();
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Reporters\Dtos\CreateReporterDto.cs" -Value @'
+using System.ComponentModel.DataAnnotations;
+using LostFound.Reporters;
+
+namespace LostFound.Reporters.Dtos
+{
+    public class CreateReporterDto
+    {
+        [StringLength(ReporterConsts.MaxNameLength, MinimumLength = ReporterConsts.MinNameLength)]
+        public string? Name { get; set; }
+
+        [Required]
+        [StringLength(ReporterConsts.MaxPhoneLength)]
+        public string Phone { get; set; } = string.Empty;
+
+        [StringLength(ReporterConsts.MaxEmailLength)]
+        public string? Email { get; set; }
+
+        public PreferredContactType PreferredContact { get; set; } = PreferredContactType.Phone;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Reporters\Dtos\ReporterDto.cs" -Value @'
+using System;
+using Volo.Abp.Application.Dtos;
+
+namespace LostFound.Reporters.Dtos
+{
+    public class ReporterDto : AuditedEntityDto<Guid>
+    {
+        public Guid? IdentityUserId { get; set; }
+
+        public string? Name { get; set; }
+
+        public string Phone { get; set; } = string.Empty;
+
+        public string? Email { get; set; }
+
+        public PreferredContactType PreferredContact { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Reporters\Dtos\UpdateReporterDto.cs" -Value @'
+using System.ComponentModel.DataAnnotations;
+using LostFound.Reporters;
+
+namespace LostFound.Reporters.Dtos
+{
+    // Phone is intentionally NOT updatable here - it is the guest-matching
+    // key used by ReporterManager.
+    public class UpdateReporterDto
+    {
+        [StringLength(ReporterConsts.MaxNameLength, MinimumLength = ReporterConsts.MinNameLength)]
+        public string? Name { get; set; }
+
+        [StringLength(ReporterConsts.MaxEmailLength)]
+        public string? Email { get; set; }
+
+        public PreferredContactType PreferredContact { get; set; } = PreferredContactType.Phone;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Reporters\IReporterAppService.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Reporters.Dtos;
+
+namespace LostFound.Reporters
+{
+    public interface IReporterAppService : IApplicationService
+    {
+        Task<ReporterDto> GetAsync(Guid id);
+
+        Task<PagedResultDto<ReporterDto>> GetListAsync(PagedAndSortedResultRequestDto input);
+
+        Task<ReporterDto> CreateAsync(CreateReporterDto input);
+
+        Task<ReporterDto> UpdateAsync(Guid id, UpdateReporterDto input);
+
+        Task DeleteAsync(Guid id);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Reports\Dtos\CreateReportDto.cs" -Value @'
+using System;
+using System.ComponentModel.DataAnnotations;
+using LostFound.Reports;
+using LostFound.Reporters;
+
+namespace LostFound.Reports.Dtos
+{
+    public class CreateReportDto
+    {
+        // Structured Location dropdown - unchanged, still required.
+        [Required]
+        public Guid LocationId { get; set; }
+
+        // Optional "Specific Location" free-text field next to the dropdown.
+        [StringLength(ReportConsts.MaxLocationDetailsLength)]
+        public string? LocationDetails { get; set; }
+
+        [Required]
+        public ReportType Type { get; set; }
+
+        public string? Description { get; set; }
+
+        public DateTime? LostFoundDate { get; set; }
+
+        [StringLength(ReportConsts.MaxImagePathLength)]
+        public string? ImagePath { get; set; }
+
+        public bool IsItemWithFinder { get; set; }
+
+        [StringLength(ReportConsts.MaxPickupLocationLength)]
+        public string? PickupLocation { get; set; }
+
+        // ---- Guest-only contact info (ignored for authenticated users) ----
+        public string? ReporterName { get; set; }
+        public string? ReporterPhone { get; set; }
+        public string? ReporterEmail { get; set; }
+        public PreferredContactType PreferredContact { get; set; } = PreferredContactType.Phone;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Reports\Dtos\GetReportListDto.cs" -Value @'
+using System;
+using Volo.Abp.Application.Dtos;
+
+namespace LostFound.Reports.Dtos
+{
+    public class GetReportListDto : PagedAndSortedResultRequestDto
+    {
+        public string? Filter { get; set; }
+        public ReportType? Type { get; set; }
+        public ReportStatus? Status { get; set; }
+        public Guid? LocationId { get; set; }
+        public Guid? ReporterId { get; set; }
+
+        // Optional, internal/analytics use only - never required in the UI.
+        public Guid? CategoryId { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Reports\Dtos\ReportDto.cs" -Value @'
+using System;
+using System.Collections.Generic;
+using Volo.Abp.Application.Dtos;
+
+namespace LostFound.Reports.Dtos
+{
+    public class ReportDto : AuditedEntityDto<Guid>
+    {
+        public Guid ReporterId { get; set; }
+
+        // Nullable - null until AI classification runs.
+        public Guid? CategoryId { get; set; }
+
+        public Guid LocationId { get; set; }
+
+        public string? LocationDetails { get; set; }
+
+        public ReportType Type { get; set; }
+        public string? Description { get; set; }
+        public DateTime? LostFoundDate { get; set; }
+        public string? ImagePath { get; set; }
+        public bool IsItemWithFinder { get; set; }
+        public string? PickupLocation { get; set; }
+        public ReportStatus Status { get; set; }
+        public bool HasEmbedding { get; set; }
+
+        // ---- AI-generated metadata (read-only, never set by the user) ----
+        public string? Color { get; set; }
+        public string? AiObjectType { get; set; }
+        public string? AiBrand { get; set; }
+        public List<string> AiTags { get; set; } = new();
+        public bool IsAiClassified { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Reports\Dtos\UpdateReportDto.cs" -Value @'
+using System;
+using System.ComponentModel.DataAnnotations;
+using LostFound.Reports;
+
+namespace LostFound.Reports.Dtos
+{
+    public class UpdateReportDto
+    {
+        [Required]
+        public ReportStatus Status { get; set; } = ReportStatus.Open;
+
+        public string? Description { get; set; }
+
+        [StringLength(ReportConsts.MaxLocationDetailsLength)]
+        public string? LocationDetails { get; set; }
+
+        public DateTime? LostFoundDate { get; set; }
+
+        [StringLength(ReportConsts.MaxImagePathLength)]
+        public string? ImagePath { get; set; }
+
+        public bool IsItemWithFinder { get; set; }
+
+        [StringLength(ReportConsts.MaxPickupLocationLength)]
+        public string? PickupLocation { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application.Contracts\Reports\IReportAppService.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Reports.Dtos;
+
+namespace LostFound.Reports
+{
+    // CRUD ONLY - AI search lives in IAiSearchAppService, AI match review
+    // lives in IMatchAppService.
+    public interface IReportAppService : IApplicationService
+    {
+        Task<ReportDto> GetAsync(Guid id);
+        Task<PagedResultDto<ReportDto>> GetListAsync(GetReportListDto input);
+        Task<ReportDto> CreateAsync(CreateReportDto input);
+        Task<ReportDto> UpdateAsync(Guid id, UpdateReportDto input);
+        Task DeleteAsync(Guid id);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\AIProviderOptions.cs" -Value @'
+namespace LostFound.AI
+{
+    // Bound from configuration section "LostFound:AI".
+    public class AIProviderOptions
+    {
+        // Default = Gemini: free tier, hosted, supports both text embedding
+        // and vision (image captioning + classification) out of the box.
+        public string Provider { get; set; } = "Gemini";
+
+        public GeminiOptions Gemini { get; set; } = new();
+        public OllamaOptions Ollama { get; set; } = new();
+        public HuggingFaceOptions HuggingFace { get; set; } = new();
+        public OpenAIOptions OpenAI { get; set; } = new();
+    }
+
+    public class GeminiOptions
+    {
+        public string ApiKey { get; set; } = string.Empty;
+
+        public string? EmbeddingModel { get; set; }
+        public string? TextModel { get; set; }
+    }
+
+    public class OllamaOptions
+    {
+        public string BaseUrl { get; set; } = "http://localhost:11434";
+        public string Model { get; set; } = "nomic-embed-text";
+
+        // Vision-capable model for image captioning/classification, e.g.
+        // `ollama pull llava`.
+        public string VisionModel { get; set; } = "llava";
+    }
+
+    public class HuggingFaceOptions
+    {
+        public string ApiKey { get; set; } = string.Empty;
+        public string Model { get; set; } = "sentence-transformers/all-MiniLM-L6-v2";
+        public string ImageCaptionModel { get; set; } = "nlpconnect/vit-gpt2-image-captioning";
+    }
+
+    public class OpenAIOptions
+    {
+        public string ApiKey { get; set; } = string.Empty;
+        public string Model { get; set; } = "text-embedding-3-small";
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\AiMatchingService.cs" -Value @'
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Volo.Abp.DependencyInjection;
+using LostFound.Reports;
+using LostFound.Matching;
+
+namespace LostFound.AI
+{
+    public class AiMatchingService : IAiMatchingService, ITransientDependency
+    {
+        private readonly IEmbeddingProvider _embeddingProvider;
+        private readonly IReportRepository _reportRepository;
+        private readonly ILogger<AiMatchingService> _logger;
+
+        public AiMatchingService(
+            IEmbeddingProvider embeddingProvider,
+            IReportRepository reportRepository,
+            ILogger<AiMatchingService> logger)
+        {
+            _embeddingProvider = embeddingProvider;
+            _reportRepository = reportRepository;
+            _logger = logger;
+        }
+
+        public async Task<List<RankedReportResult>> FindSimilarReportsAsync(
+            string? searchText,
+            byte[]? imageBytes,
+            ReportType? type,
+            int maxResults = 10)
+        {
+            _logger.LogInformation("========== AI Matching Started ==========");
+            _logger.LogInformation("Search Text: {Text}", searchText);
+            _logger.LogInformation("Has Image: {HasImage}", imageBytes != null);
+
+            //------------------------------------------
+            // Query Embeddings
+            //------------------------------------------
+            float[]? queryTextEmbedding = null;
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                queryTextEmbedding = await _embeddingProvider.GenerateEmbeddingAsync(searchText);
+
+                _logger.LogInformation(
+                    "Query Text Embedding Length = {Length}",
+                    queryTextEmbedding.Length);
+            }
+
+            float[]? queryImageEmbedding = null;
+
+            if (imageBytes != null)
+            {
+                queryImageEmbedding =
+                    await _embeddingProvider.GenerateImageEmbeddingAsync(imageBytes);
+
+                _logger.LogInformation(
+                    "Query Image Embedding Length = {Length}",
+                    queryImageEmbedding.Length);
+            }
+
+            //------------------------------------------
+            // Load Reports
+            //------------------------------------------
+            var candidates = await _reportRepository.GetSearchableReportsAsync(type);
+
+            _logger.LogInformation(
+                "Repository returned {Count} searchable report(s).",
+                candidates.Count);
+
+            var results = new List<RankedReportResult>();
+
+            foreach (var r in candidates)
+            {
+                var textEmbedding = r.GetEmbeddingVector();
+                var imageEmbedding = r.GetImageEmbeddingVector();
+
+                _logger.LogInformation("------------------------------------");
+                _logger.LogInformation("Report: {Id}", r.Id);
+                _logger.LogInformation("Description: {Description}", r.Description);
+
+                _logger.LogInformation(
+                    "Stored Text Embedding Length: {Length}",
+                    textEmbedding?.Length ?? 0);
+
+                _logger.LogInformation(
+                    "Stored Image Embedding Length: {Length}",
+                    imageEmbedding?.Length ?? 0);
+
+                double? textScore = null;
+
+                if (queryTextEmbedding != null &&
+                    textEmbedding != null &&
+                    textEmbedding.Length > 0)
+                {
+                    textScore = CosineSimilarityCalculator.CalculatePercentage(
+                        queryTextEmbedding,
+                        textEmbedding);
+
+                    _logger.LogInformation(
+                        "Text Score = {Score}",
+                        textScore);
+                }
+
+                double? imageScore = null;
+
+                if (queryImageEmbedding != null &&
+                    imageEmbedding != null &&
+                    imageEmbedding.Length > 0)
+                {
+                    imageScore = CosineSimilarityCalculator.CalculatePercentage(
+                        queryImageEmbedding,
+                        imageEmbedding);
+
+                    _logger.LogInformation(
+                        "Image Score = {Score}",
+                        imageScore);
+                }
+
+                double combined = (textScore, imageScore) switch
+                {
+                    (not null, not null) => textScore.Value * 0.6 + imageScore.Value * 0.4,
+                    (not null, null) => textScore.Value,
+                    (null, not null) => imageScore.Value,
+                    _ => 0
+                };
+
+                _logger.LogInformation(
+                    "Combined Score = {Score}",
+                    combined);
+
+                if (combined <= 0)
+                {
+                    _logger.LogInformation("Skipped.");
+                    continue;
+                }
+
+                _logger.LogInformation("Added to results.");
+
+                results.Add(new RankedReportResult
+                {
+                    ReportId = r.Id,
+                    Description = r.Description,
+                    Color = r.Color,
+                    AiObjectType = r.AiObjectType,
+                    ScorePercentage = combined
+                });
+            }
+
+            _logger.LogInformation(
+                "Final Results Count = {Count}",
+                results.Count);
+
+            _logger.LogInformation("========== AI Matching Finished ==========");
+
+            return results
+                .OrderByDescending(x => x.ScorePercentage)
+                .Take(maxResults)
+                .ToList();
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\AiSearchAppService.cs" -Value @'
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Volo.Abp;
+using Volo.Abp.Application.Services;
+using LostFound.AI.Dtos;
+
+namespace LostFound.AI
+{
+    public class AiSearchAppService : ApplicationService, IAiSearchAppService
+    {
+        private readonly IAiMatchingService _aiMatchingService;
+        private readonly ILogger<AiSearchAppService> _logger;
+
+        public AiSearchAppService(
+            IAiMatchingService aiMatchingService,
+            ILogger<AiSearchAppService> logger)
+        {
+            _aiMatchingService = aiMatchingService;
+            _logger = logger;
+
+            _logger.LogInformation("========== AiSearchAppService Created ==========");
+        }
+
+        public async Task<List<AiSearchResultDto>> SearchAsync(AiSearchInputDto input)
+        {
+            _logger.LogInformation("========== SearchAsync Started ==========");
+
+            _logger.LogInformation("Input Text: {Text}", input.Text);
+            _logger.LogInformation("Has Image: {HasImage}", !string.IsNullOrWhiteSpace(input.ImageBase64));
+            _logger.LogInformation("Type: {Type}", input.Type);
+            _logger.LogInformation("Max Results: {MaxResults}", input.MaxResults);
+            _logger.LogInformation("Minimum Score: {MinimumScore}", input.MinimumScorePercentage);
+
+            if (string.IsNullOrWhiteSpace(input.Text) &&
+                string.IsNullOrWhiteSpace(input.ImageBase64))
+            {
+                _logger.LogWarning("Search rejected because no text or image was provided.");
+
+                throw new UserFriendlyException(
+                    "Provide a description, an image, or both to search.");
+            }
+
+            byte[]? imageBytes = null;
+
+            if (!string.IsNullOrWhiteSpace(input.ImageBase64))
+            {
+                imageBytes = Convert.FromBase64String(input.ImageBase64);
+                _logger.LogInformation("Image Size: {Size} bytes", imageBytes.Length);
+            }
+
+            _logger.LogInformation("Calling IAiMatchingService.FindSimilarReportsAsync...");
+
+            var results = await _aiMatchingService.FindSimilarReportsAsync(
+                input.Text,
+                imageBytes,
+                input.Type,
+                input.MaxResults);
+
+            _logger.LogInformation(
+                "IAiMatchingService returned {Count} result(s) before filtering.",
+                results.Count);
+
+            // Apply minimum similarity filter
+            if (input.MinimumScorePercentage.HasValue)
+            {
+                results = results
+                    .Where(x => x.ScorePercentage >= input.MinimumScorePercentage.Value)
+                    .ToList();
+
+                _logger.LogInformation(
+                    "Applied minimum score filter: {Minimum}% -> {Count} result(s) remaining.",
+                    input.MinimumScorePercentage.Value,
+                    results.Count);
+            }
+
+            foreach (var result in results)
+            {
+                _logger.LogInformation(
+                    "ReportId: {Id} | Score: {Score}% | Description: {Description}",
+                    result.ReportId,
+                    result.ScorePercentage,
+                    result.Description);
+            }
+
+            var dto = results.Select(r => new AiSearchResultDto
+            {
+                ReportId = r.ReportId,
+                Description = r.Description,
+                Color = r.Color,
+                AiObjectType = r.AiObjectType,
+                ScorePercentage = r.ScorePercentage
+            }).ToList();
+
+            _logger.LogInformation("Returning {Count} DTO(s).", dto.Count);
+            _logger.LogInformation("========== SearchAsync Finished ==========");
+
+            return dto;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\LostFoundAiProvidersServiceCollectionExtensions.cs" -Value @'
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using LostFound.AI.Providers;
+
+namespace LostFound.AI
+{
+    // Replaces the old separate "LostFoundAIModule" (previously in its own
+    // LostFound.AI project). AI providers are now merged directly into
+    // LostFound.Application, so this is a plain IServiceCollection
+    // extension called once from LostFoundApplicationModule.ConfigureServices.
+    //
+    // Usage (in LostFoundApplicationModule.cs):
+    //
+    //   public override void ConfigureServices(ServiceConfigurationContext context)
+    //   {
+    //       context.Services.AddLostFoundAiProviders(context.Services.GetConfiguration());
+    //       // ... rest of module configuration
+    //   }
+    //
+    // Wires BOTH IEmbeddingProvider AND IItemClassificationProvider to the
+    // SAME configured provider, so you never end up mixing e.g. Gemini
+    // embeddings with an Ollama classifier by accident.
+    public static class LostFoundAiProvidersServiceCollectionExtensions
+    {
+        public static IServiceCollection AddLostFoundAiProviders(
+            this IServiceCollection services,
+            IConfiguration configuration)
+        {
+            services.Configure<AIProviderOptions>(configuration.GetSection("LostFound:AI"));
+
+            var provider = configuration["LostFound:AI:Provider"] ?? "Gemini";
+
+            services.AddHttpClient();
+
+            switch (provider.Trim().ToLowerInvariant())
+            {
+                case "ollama":
+                    services.AddHttpClient<IEmbeddingProvider, OllamaEmbeddingProvider>();
+                    services.AddHttpClient<IItemClassificationProvider, OllamaClassificationProvider>();
+                    break;
+                case "huggingface":
+                    services.AddHttpClient<IEmbeddingProvider, HuggingFaceEmbeddingProvider>();
+                    services.AddHttpClient<IItemClassificationProvider, HuggingFaceClassificationProvider>();
+                    break;
+                case "openai":
+                    services.AddHttpClient<IEmbeddingProvider, OpenAIEmbeddingProvider>();
+                    services.AddHttpClient<IItemClassificationProvider, OpenAIClassificationProvider>();
+                    break;
+                case "gemini":
+                default:
+                    services.AddHttpClient<IEmbeddingProvider, GeminiEmbeddingProvider>();
+                    services.AddHttpClient<IItemClassificationProvider, GeminiClassificationProvider>();
+                    break;
+            }
+
+            return services;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\GeminiClassificationProvider.cs" -Value @'
+using System;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Net.Http;
+using Microsoft.Extensions.Options;
+
+namespace LostFound.AI.Providers
+{
+    public class GeminiClassificationProvider : IItemClassificationProvider
+    {
+        private readonly HttpClient _httpClient;
+        private readonly GeminiOptions _options;
+
+        public string ProviderName => "Gemini";
+
+        public GeminiClassificationProvider(
+            HttpClient httpClient,
+            IOptions<AIProviderOptions> options)
+        {
+            _httpClient = httpClient;
+            _options = options.Value.Gemini
+                ?? throw new ArgumentNullException(nameof(options));
+        }
+
+        public async Task<ItemClassificationResult> ClassifyAsync(
+            string? description,
+            byte[]? imageBytes,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(_options.ApiKey))
+            {
+                throw new InvalidOperationException("Gemini API Key is missing.");
+            }
+
+            if (string.IsNullOrWhiteSpace(_options.TextModel))
+            {
+                throw new InvalidOperationException("Gemini TextModel is missing.");
+            }
+
+            var prompt =
+    "Analyze the following lost or found item.\n\n" +
+    "Return ONLY valid JSON.\n" +
+    "Do not return markdown.\n" +
+    "Do not return explanations.\n\n" +
+    "JSON format:\n\n" +
+    "{\n" +
+    "  \"category\": \"\",\n" +
+    "  \"objectType\": \"\",\n" +
+    "  \"color\": \"\",\n" +
+    "  \"brand\": \"\",\n" +
+    "  \"tags\": []\n" +
+    "}\n\n" +
+    "Description:\n" +
+    (description ?? "(Image only)");
+
+            var raw = await GeminiVisionHelper.GenerateTextAsync(
+                _httpClient,
+                _options.ApiKey,
+                _options.TextModel,
+                prompt,
+                imageBytes,
+                cancellationToken);
+
+            return GeminiLikeJsonParser.Parse(raw);
+        }
+    }
+
+    internal static class GeminiLikeJsonParser
+    {
+        public static ItemClassificationResult Parse(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return new ItemClassificationResult
+                {
+                    CategoryName = "Uncategorized"
+                };
+            }
+
+            try
+            {
+                var cleaned = raw.Trim();
+
+                if (cleaned.StartsWith("```"))
+                {
+                    cleaned = cleaned
+                        .Replace("```json", "")
+                        .Replace("```", "")
+                        .Trim();
+                }
+
+                var start = cleaned.IndexOf('{');
+                var end = cleaned.LastIndexOf('}');
+
+                if (start >= 0 && end > start)
+                {
+                    cleaned = cleaned.Substring(start, end - start + 1);
+                }
+
+                using var document = JsonDocument.Parse(cleaned);
+
+                var root = document.RootElement;
+
+                var result = new ItemClassificationResult
+                {
+                    CategoryName =
+                        root.TryGetProperty("category", out var category)
+                            ? category.GetString() ?? "Uncategorized"
+                            : "Uncategorized",
+
+                    ObjectType =
+                        root.TryGetProperty("objectType", out var objectType)
+                            ? objectType.GetString()
+                            : null,
+
+                    Color =
+                        root.TryGetProperty("color", out var color)
+                            ? color.GetString()
+                            : null,
+
+                    Brand =
+                        root.TryGetProperty("brand", out var brand)
+                            ? brand.GetString()
+                            : null
+                };
+
+                if (root.TryGetProperty("tags", out var tags) &&
+                    tags.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var tag in tags.EnumerateArray())
+                    {
+                        var value = tag.GetString();
+
+                        if (!string.IsNullOrWhiteSpace(value))
+                        {
+                            result.Tags.Add(value);
+                        }
+                    }
+                }
+
+                return result;
+            }
+            catch
+            {
+                return new ItemClassificationResult
+                {
+                    CategoryName = "Uncategorized"
+                };
+            }
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\GeminiEmbeddingProvider.cs" -Value @'
+using System;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+
+namespace LostFound.AI.Providers
+{
+    public class GeminiEmbeddingProvider : IEmbeddingProvider
+    {
+        private readonly HttpClient _httpClient;
+        private readonly GeminiOptions _options;
+
+        public string ProviderName => "Gemini";
+
+        public GeminiEmbeddingProvider(
+            HttpClient httpClient,
+            IOptions<AIProviderOptions> options)
+        {
+            _httpClient = httpClient;
+            _options = options.Value.Gemini
+                ?? throw new ArgumentNullException(nameof(options));
+        }
+
+        public async Task<float[]> GenerateEmbeddingAsync(
+            string text,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return Array.Empty<float>();
+            }
+
+            if (string.IsNullOrWhiteSpace(_options.ApiKey))
+            {
+                throw new InvalidOperationException("Gemini API Key is missing.");
+            }
+
+            if (string.IsNullOrWhiteSpace(_options.EmbeddingModel))
+            {
+                throw new InvalidOperationException("Gemini EmbeddingModel is missing.");
+            }
+
+            var url =
+                $"https://generativelanguage.googleapis.com/v1beta/models/{_options.EmbeddingModel}:embedContent?key={_options.ApiKey}";
+
+            var requestBody = new
+            {
+                model = $"models/{_options.EmbeddingModel}",
+                content = new
+                {
+                    parts = new[]
+                    {
+                        new
+                        {
+                            text = text
+                        }
+                    }
+                }
+            };
+
+            var response = await _httpClient.PostAsJsonAsync(
+                url,
+                requestBody,
+                cancellationToken);
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception(
+                    $"Gemini Embedding Error ({(int)response.StatusCode})\n{body}");
+            }
+
+            var result =
+                await response.Content.ReadFromJsonAsync<GeminiEmbedResponse>(
+                    cancellationToken: cancellationToken);
+
+            return result?.Embedding?.Values?
+                       .Select(v => (float)v)
+                       .ToArray()
+                   ?? Array.Empty<float>();
+        }
+
+        public async Task<float[]> GenerateImageEmbeddingAsync(
+     byte[] imageBytes,
+     CancellationToken cancellationToken = default)
+        {
+            if (imageBytes == null || imageBytes.Length == 0)
+            {
+                return Array.Empty<float>();
+            }
+
+            if (string.IsNullOrWhiteSpace(_options.ApiKey))
+            {
+                throw new InvalidOperationException("Gemini API Key is missing.");
+            }
+
+            if (string.IsNullOrWhiteSpace(_options.TextModel))
+            {
+                throw new InvalidOperationException("Gemini TextModel is missing.");
+            }
+
+            // تحويل الصورة إلى وصف نصي باستخدام نموذج النص المحدد في الإعدادات
+            var caption = await GeminiVisionHelper.CaptionImageAsync(
+                _httpClient,
+                _options.ApiKey,
+                _options.TextModel,
+                imageBytes,
+                cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(caption))
+            {
+                return Array.Empty<float>();
+            }
+
+            // إنشاء Embedding للوصف النصي
+            return await GenerateEmbeddingAsync(
+                caption,
+                cancellationToken);
+        }
+
+        #region Response Models
+
+        private sealed class GeminiEmbedResponse
+        {
+            [JsonPropertyName("embedding")]
+            public GeminiEmbeddingValues? Embedding { get; set; }
+        }
+
+        private sealed class GeminiEmbeddingValues
+        {
+            [JsonPropertyName("values")]
+            public double[]? Values { get; set; }
+        }
+
+        #endregion
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\GeminiVisionHelper.cs" -Value @'
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace LostFound.AI.Providers
+{
+    internal static class GeminiVisionHelper
+    {
+        private const string BaseUrl =
+            "https://generativelanguage.googleapis.com/v1beta/models";
+
+        public static async Task<string> GenerateTextAsync(
+            HttpClient httpClient,
+            string apiKey,
+            string model,
+            string prompt,
+            byte[]? imageBytes,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                throw new InvalidOperationException("Gemini API Key is missing.");
+            }
+
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                throw new InvalidOperationException("Gemini model is missing.");
+            }
+
+            var parts = new List<object>
+            {
+                new
+                {
+                    text = prompt
+                }
+            };
+
+            if (imageBytes != null && imageBytes.Length > 0)
+            {
+                parts.Add(new
+                {
+                    inline_data = new
+                    {
+                        mime_type = "image/jpeg",
+                        data = Convert.ToBase64String(imageBytes)
+                    }
+                });
+            }
+
+            var requestBody = new
+            {
+                contents = new[]
+                {
+                    new
+                    {
+                        parts = parts
+                    }
+                },
+                generationConfig = new
+                {
+                    temperature = 0.2
+                }
+            };
+
+            var url = $"{BaseUrl}/{model}:generateContent?key={apiKey}";
+
+            var response = await httpClient.PostAsJsonAsync(
+                url,
+                requestBody,
+                cancellationToken);
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception(
+                    $"Gemini request failed.\n" +
+                    $"Status : {(int)response.StatusCode} ({response.StatusCode})\n\n" +
+                    body);
+            }
+
+            var result = JsonSerializer.Deserialize<GenerateContentResponse>(
+                body,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+            return result?
+                       .Candidates?
+                       .FirstOrDefault()?
+                       .Content?
+                       .Parts?
+                       .FirstOrDefault()?
+                       .Text?
+                       .Trim()
+                   ?? string.Empty;
+        }
+
+        public static Task<string> CaptionImageAsync(
+     HttpClient httpClient,
+     string apiKey,
+     string model,
+     byte[] imageBytes,
+     CancellationToken cancellationToken)
+        {
+            return GenerateTextAsync(
+                httpClient,
+                apiKey,
+                model,
+                "Describe this object in one short sentence. Mention the object type, color, material and brand if visible.",
+                imageBytes,
+                cancellationToken);
+        }
+
+        #region Response Models
+
+        private sealed class GenerateContentResponse
+        {
+            [JsonPropertyName("candidates")]
+            public List<Candidate>? Candidates { get; set; }
+        }
+
+        private sealed class Candidate
+        {
+            [JsonPropertyName("content")]
+            public CandidateContent? Content { get; set; }
+        }
+
+        private sealed class CandidateContent
+        {
+            [JsonPropertyName("parts")]
+            public List<Part>? Parts { get; set; }
+        }
+
+        private sealed class Part
+        {
+            [JsonPropertyName("text")]
+            public string? Text { get; set; }
+        }
+
+        #endregion
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\HuggingFaceClassificationProvider.cs" -Value @'
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+
+namespace LostFound.AI.Providers
+{
+    // HF's free inference API is best at single-purpose models, not
+    // flexible JSON-structured chat. This uses zero-shot classification
+    // against a fixed label set for Category, plus the image caption (if
+    // any) for the remaining free-text fields.
+    public class HuggingFaceClassificationProvider : IItemClassificationProvider
+    {
+        private static readonly string[] CandidateCategories =
+        {
+            "Electronics", "Bags", "Documents", "Jewelry", "Clothing", "Keys", "Wallets", "Toys", "Other"
+        };
+
+        private readonly HttpClient _httpClient;
+        private readonly HuggingFaceOptions _options;
+
+        public string ProviderName => "HuggingFace";
+
+        public HuggingFaceClassificationProvider(HttpClient httpClient, IOptions<AIProviderOptions> options)
+        {
+            _httpClient = httpClient;
+            _options = options.Value.HuggingFace;
+        }
+
+        public async Task<ItemClassificationResult> ClassifyAsync(string? description, byte[]? imageBytes, CancellationToken cancellationToken = default)
+        {
+            var result = new ItemClassificationResult();
+            var textForClassification = description;
+
+            if (imageBytes != null)
+            {
+                var captionRequest = new HttpRequestMessage(HttpMethod.Post, $"https://api-inference.huggingface.co/models/{_options.ImageCaptionModel}");
+                captionRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+                captionRequest.Content = new ByteArrayContent(imageBytes);
+
+                var captionResponse = await _httpClient.SendAsync(captionRequest, cancellationToken);
+                if (captionResponse.IsSuccessStatusCode)
+                {
+                    var caption = await captionResponse.Content.ReadFromJsonAsync<HfCaptionResult[]>(cancellationToken: cancellationToken);
+                    if (caption?.Length > 0)
+                    {
+                        result.ImageCaption = caption[0].GeneratedText;
+                        textForClassification = string.IsNullOrWhiteSpace(textForClassification)
+                            ? result.ImageCaption
+                            : $"{textForClassification}. {result.ImageCaption}";
+                    }
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(textForClassification))
+            {
+                result.CategoryName = "Uncategorized";
+                return result;
+            }
+
+            var zeroShotRequest = new HttpRequestMessage(HttpMethod.Post, "https://api-inference.huggingface.co/models/facebook/bart-large-mnli");
+            zeroShotRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            zeroShotRequest.Content = JsonContent.Create(new { inputs = textForClassification, parameters = new { candidate_labels = CandidateCategories } });
+
+            var zeroShotResponse = await _httpClient.SendAsync(zeroShotRequest, cancellationToken);
+            if (zeroShotResponse.IsSuccessStatusCode)
+            {
+                var zeroShot = await zeroShotResponse.Content.ReadFromJsonAsync<HfZeroShotResult>(cancellationToken: cancellationToken);
+                result.CategoryName = zeroShot?.Labels?.Length > 0 ? zeroShot.Labels[0] : "Other";
+            }
+            else
+            {
+                result.CategoryName = "Other";
+            }
+
+            return result;
+        }
+
+        private class HfCaptionResult
+        {
+            public string? GeneratedText { get; set; }
+        }
+
+        private class HfZeroShotResult
+        {
+            public string[]? Labels { get; set; }
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\HuggingFaceEmbeddingProvider.cs" -Value @'
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+
+namespace LostFound.AI.Providers
+{
+    public class HuggingFaceEmbeddingProvider : IEmbeddingProvider
+    {
+        private readonly HttpClient _httpClient;
+        private readonly HuggingFaceOptions _options;
+
+        public string ProviderName => "HuggingFace";
+
+        public HuggingFaceEmbeddingProvider(HttpClient httpClient, IOptions<AIProviderOptions> options)
+        {
+            _httpClient = httpClient;
+            _options = options.Value.HuggingFace;
+        }
+
+        public async Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, $"https://api-inference.huggingface.co/pipeline/feature-extraction/{_options.Model}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            request.Content = JsonContent.Create(new { inputs = text, options = new { wait_for_model = true } });
+
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadFromJsonAsync<float[]>(cancellationToken: cancellationToken);
+            return result ?? Array.Empty<float>();
+        }
+
+        // Uses an image-captioning model (e.g. nlpconnect/vit-gpt2-image-captioning)
+        // then embeds the resulting caption - same caption-then-embed
+        // approach used by the other providers.
+        public async Task<float[]> GenerateImageEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, $"https://api-inference.huggingface.co/models/{_options.ImageCaptionModel}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            request.Content = new ByteArrayContent(imageBytes);
+
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadFromJsonAsync<HfCaptionResult[]>(cancellationToken: cancellationToken);
+            var caption = result?.Length > 0 ? result[0].GeneratedText : string.Empty;
+
+            return await GenerateEmbeddingAsync(caption ?? "item", cancellationToken);
+        }
+
+        private class HfCaptionResult
+        {
+            public string? GeneratedText { get; set; }
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\OllamaClassificationProvider.cs" -Value @'
+using System.Threading;
+using System.Threading.Tasks;
+using System.Net.Http;
+using Microsoft.Extensions.Options;
+
+namespace LostFound.AI.Providers
+{
+    public class OllamaClassificationProvider : IItemClassificationProvider
+    {
+        private readonly HttpClient _httpClient;
+        private readonly OllamaOptions _options;
+
+        public string ProviderName => "Ollama";
+
+        public OllamaClassificationProvider(HttpClient httpClient, IOptions<AIProviderOptions> options)
+        {
+            _httpClient = httpClient;
+            _options = options.Value.Ollama;
+        }
+
+        public async Task<ItemClassificationResult> ClassifyAsync(string? description, byte[]? imageBytes, CancellationToken cancellationToken = default)
+        {
+            var prompt =
+                "Analyze this lost-and-found item (Arabic or English). Return ONLY JSON: " +
+                "{\"category\":..,\"objectType\":..,\"color\":..,\"brand\":..,\"tags\":[..]}. " +
+                $"Description: {description ?? "(none, use the image only)"}";
+
+            var model = imageBytes != null ? _options.VisionModel : _options.Model;
+            var raw = await OllamaVisionHelper.GenerateAsync(_httpClient, model, prompt, imageBytes, cancellationToken);
+
+            return GeminiLikeJsonParser.Parse(raw);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\OllamaEmbeddingProvider.cs" -Value @'
+using System;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+
+namespace LostFound.AI.Providers
+{
+    public class OllamaEmbeddingProvider : IEmbeddingProvider
+    {
+        private readonly HttpClient _httpClient;
+        private readonly OllamaOptions _options;
+
+        public string ProviderName => "Ollama";
+
+        public OllamaEmbeddingProvider(HttpClient httpClient, IOptions<AIProviderOptions> options)
+        {
+            _httpClient = httpClient;
+            _options = options.Value.Ollama;
+            _httpClient.BaseAddress = new Uri(_options.BaseUrl);
+        }
+
+        public async Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+        {
+            var response = await _httpClient.PostAsJsonAsync(
+                "/api/embeddings",
+                new OllamaEmbeddingRequest { Model = _options.Model, Prompt = text },
+                cancellationToken
+            );
+
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<OllamaEmbeddingResponse>(cancellationToken: cancellationToken);
+            return result?.Embedding ?? Array.Empty<float>();
+        }
+
+        // Requires a vision-capable local model (e.g. `ollama pull llava`)
+        // set via LostFound:AI:Ollama:VisionModel - captions the image, then
+        // embeds the caption with the text model above.
+        public async Task<float[]> GenerateImageEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            var caption = await OllamaVisionHelper.CaptionImageAsync(_httpClient, _options.VisionModel, imageBytes, cancellationToken);
+            return await GenerateEmbeddingAsync(caption, cancellationToken);
+        }
+
+        private class OllamaEmbeddingRequest
+        {
+            [JsonPropertyName("model")] public string Model { get; set; } = string.Empty;
+            [JsonPropertyName("prompt")] public string Prompt { get; set; } = string.Empty;
+        }
+
+        private class OllamaEmbeddingResponse
+        {
+            [JsonPropertyName("embedding")] public float[]? Embedding { get; set; }
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\OllamaVisionHelper.cs" -Value @'
+using System;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace LostFound.AI.Providers
+{
+    internal static class OllamaVisionHelper
+    {
+        public static async Task<string> CaptionImageAsync(HttpClient httpClient, string visionModel, byte[] imageBytes, CancellationToken cancellationToken)
+        {
+            return await GenerateAsync(
+                httpClient,
+                visionModel,
+                "Describe this object in one short sentence (type, color, brand if visible).",
+                imageBytes,
+                cancellationToken
+            );
+        }
+
+        public static async Task<string> GenerateAsync(HttpClient httpClient, string model, string prompt, byte[]? imageBytes, CancellationToken cancellationToken)
+        {
+            var request = new OllamaGenerateRequest
+            {
+                Model = model,
+                Prompt = prompt,
+                Stream = false,
+                Images = imageBytes != null ? new[] { Convert.ToBase64String(imageBytes) } : null
+            };
+
+            var response = await httpClient.PostAsJsonAsync("/api/generate", request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken: cancellationToken);
+            return result?.Response ?? string.Empty;
+        }
+
+        private class OllamaGenerateRequest
+        {
+            [JsonPropertyName("model")] public string Model { get; set; } = string.Empty;
+            [JsonPropertyName("prompt")] public string Prompt { get; set; } = string.Empty;
+            [JsonPropertyName("stream")] public bool Stream { get; set; }
+            [JsonPropertyName("images")] public string[]? Images { get; set; }
+        }
+
+        private class OllamaGenerateResponse
+        {
+            [JsonPropertyName("response")] public string? Response { get; set; }
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\OpenAIClassificationProvider.cs" -Value @'
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+
+namespace LostFound.AI.Providers
+{
+    public class OpenAIClassificationProvider : IItemClassificationProvider
+    {
+        private readonly HttpClient _httpClient;
+
+        public string ProviderName => "OpenAI";
+
+        public OpenAIClassificationProvider(HttpClient httpClient, IOptions<AIProviderOptions> options)
+        {
+            _httpClient = httpClient;
+            var apiKey = options.Value.OpenAI.ApiKey;
+            _httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        }
+
+        public async Task<ItemClassificationResult> ClassifyAsync(string? description, byte[]? imageBytes, CancellationToken cancellationToken = default)
+        {
+            var prompt =
+                "Analyze this lost-and-found item (Arabic or English). Return ONLY JSON: " +
+                "{\"category\":..,\"objectType\":..,\"color\":..,\"brand\":..,\"tags\":[..]}. " +
+                $"Description: {description ?? "(none, use the image only)"}";
+
+            var raw = await OpenAIVisionHelper.GenerateAsync(_httpClient, prompt, imageBytes, cancellationToken);
+            return GeminiLikeJsonParser.Parse(raw);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\AI\Providers\OpenAIEmbeddingProvider.cs" -Value @'
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+
+namespace LostFound.AI.Providers
+{
+    public class OpenAIEmbeddingProvider : IEmbeddingProvider
+    {
+        private readonly HttpClient _httpClient;
+        private readonly OpenAIOptions _options;
+
+        public string ProviderName => "OpenAI";
+
+        public OpenAIEmbeddingProvider(HttpClient httpClient, IOptions<AIProviderOptions> options)
+        {
+            _httpClient = httpClient;
+            _options = options.Value.OpenAI;
+            _httpClient.BaseAddress = new Uri("https://api.openai.com/v1/");
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+        }
+
+        public async Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken cancellationToken = default)
+        {
+            var response = await _httpClient.PostAsJsonAsync(
+                "embeddings",
+                new OpenAIEmbeddingRequest { Model = _options.Model, Input = text },
+                cancellationToken
+            );
+
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<OpenAIEmbeddingResponse>(cancellationToken: cancellationToken);
+            return result?.Data?.Length > 0 ? result.Data[0].Embedding : Array.Empty<float>();
+        }
+
+        // Caption via GPT-4o-mini vision, then embed the caption.
+        public async Task<float[]> GenerateImageEmbeddingAsync(byte[] imageBytes, CancellationToken cancellationToken = default)
+        {
+            var caption = await OpenAIVisionHelper.CaptionImageAsync(_httpClient, imageBytes, cancellationToken);
+            return await GenerateEmbeddingAsync(caption, cancellationToken);
+        }
+
+        private class OpenAIEmbeddingRequest
+        {
+            [JsonPropertyName("model")] public string Model { get; set; } = string.Empty;
+            [JsonPropertyName("input")] public string Input { get; set; } = string.Empty;
+        }
+
+        private class OpenAIEmbeddingResponse
+        {
+            [JsonPropertyName("data")] public OpenAIEmbeddingData[]? Data { get; set; }
+        }
+
+        private class OpenAIEmbeddingData
+        {
+            [JsonPropertyName("embedding")] public float[] Embedding { get; set; } = Array.Empty<float>();
+        }
+    }
+
+    internal static class OpenAIVisionHelper
+    {
+        public static async Task<string> CaptionImageAsync(HttpClient httpClient, byte[] imageBytes, CancellationToken cancellationToken)
+        {
+            return await GenerateAsync(
+                httpClient,
+                "Describe this object in one short sentence (type, color, brand if visible).",
+                imageBytes,
+                cancellationToken
+            );
+        }
+
+        public static async Task<string> GenerateAsync(HttpClient httpClient, string prompt, byte[]? imageBytes, CancellationToken cancellationToken)
+        {
+            var content = new System.Collections.Generic.List<object> { new { type = "text", text = prompt } };
+
+            if (imageBytes != null)
+            {
+                content.Add(new
+                {
+                    type = "image_url",
+                    image_url = new { url = $"data:image/jpeg;base64,{Convert.ToBase64String(imageBytes)}" }
+                });
+            }
+
+            var response = await httpClient.PostAsJsonAsync(
+                "chat/completions",
+                new { model = "gpt-4o-mini", messages = new[] { new { role = "user", content } } },
+                cancellationToken
+            );
+
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<OpenAIChatResponse>(cancellationToken: cancellationToken);
+            return result?.Choices?.Length > 0 ? result.Choices[0].Message?.Content ?? string.Empty : string.Empty;
+        }
+
+        private class OpenAIChatResponse
+        {
+            [JsonPropertyName("choices")] public OpenAIChoice[]? Choices { get; set; }
+        }
+
+        private class OpenAIChoice
+        {
+            [JsonPropertyName("message")] public OpenAIMessage? Message { get; set; }
+        }
+
+        private class OpenAIMessage
+        {
+            [JsonPropertyName("content")] public string? Content { get; set; }
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Analytics\ReportAnalyticsAppService.cs" -Value @'
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Services;
+using LostFound.Reports;
+using LostFound.Categories;
+using LostFound.Locations;
+using LostFound.Analytics.Dtos;
+
+namespace LostFound.Analytics
+{
+    public class ReportAnalyticsAppService : ApplicationService, IReportAnalyticsAppService
+    {
+        private readonly IReportRepository _reportRepository;
+        private readonly ICategoryRepository _categoryRepository;
+        private readonly ILocationRepository _locationRepository;
+
+        public ReportAnalyticsAppService(
+            IReportRepository reportRepository,
+            ICategoryRepository categoryRepository,
+            ILocationRepository locationRepository)
+        {
+            _reportRepository = reportRepository;
+            _categoryRepository = categoryRepository;
+            _locationRepository = locationRepository;
+        }
+
+        public async Task<ReportAnalyticsDto> GetAsync(int topN = 10)
+        {
+            var reports = await _reportRepository.GetListAsync();
+            var categories = await _categoryRepository.GetListAsync();
+            var locations = await _locationRepository.GetListAsync();
+
+            var categoryNameById = categories.ToDictionary(c => c.Id, c => c.Name);
+            var locationNameById = locations.ToDictionary(l => l.Id, l => l.PlaceName);
+
+            return new ReportAnalyticsDto
+            {
+                TopCategories = reports
+                    .Where(r => r.CategoryId.HasValue && categoryNameById.ContainsKey(r.CategoryId.Value))
+                    .GroupBy(r => categoryNameById[r.CategoryId!.Value])
+                    .Select(g => new NameCountDto { Name = g.Key, Count = g.Count() })
+                    .OrderByDescending(x => x.Count).Take(topN).ToList(),
+
+                TopObjectTypes = reports
+                    .Where(r => !string.IsNullOrWhiteSpace(r.AiObjectType))
+                    .GroupBy(r => r.AiObjectType!)
+                    .Select(g => new NameCountDto { Name = g.Key, Count = g.Count() })
+                    .OrderByDescending(x => x.Count).Take(topN).ToList(),
+
+                TopColors = reports
+                    .Where(r => !string.IsNullOrWhiteSpace(r.Color))
+                    .GroupBy(r => r.Color!)
+                    .Select(g => new NameCountDto { Name = g.Key, Count = g.Count() })
+                    .OrderByDescending(x => x.Count).Take(topN).ToList(),
+
+                TopLocations = reports
+                    .Where(r => locationNameById.ContainsKey(r.LocationId))
+                    .GroupBy(r => locationNameById[r.LocationId])
+                    .Select(g => new NameCountDto { Name = g.Key, Count = g.Count() })
+                    .OrderByDescending(x => x.Count).Take(topN).ToList(),
+
+                TopBrands = reports
+                    .Where(r => !string.IsNullOrWhiteSpace(r.AiBrand))
+                    .GroupBy(r => r.AiBrand!)
+                    .Select(g => new NameCountDto { Name = g.Key, Count = g.Count() })
+                    .OrderByDescending(x => x.Count).Take(topN).ToList()
+            };
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\BackgroundJobs\ReportMatchingBackgroundJob.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Volo.Abp.BackgroundJobs;
+using Volo.Abp.BlobStoring;
+using Volo.Abp.DependencyInjection;
+using LostFound.AI;
+using LostFound.Reports;
+using LostFound.Categories;
+using LostFound.Matches;
+
+namespace LostFound.BackgroundJobs
+{
+    // Workflow: Save Report -> Queue this Job -> AI Classification (resolves
+    // Category) -> Generate Text Embedding -> Generate Image Embedding ->
+    // Find Similar Reports -> Create Match -> Send Notification (the last
+    // two steps happen inside MatchManager).
+    public class ReportMatchingBackgroundJob :
+        AsyncBackgroundJob<ReportMatchingBackgroundJobArgs>,
+        ITransientDependency
+    {
+        private readonly IReportRepository _reportRepository;
+        private readonly CategoryManager _categoryManager;
+        private readonly MatchManager _matchManager;
+        private readonly IEmbeddingProvider _embeddingProvider;
+        private readonly IItemClassificationProvider _classificationProvider;
+        private readonly IBlobContainer<ReportImageContainer> _imageContainer;
+        private readonly IConfiguration _configuration;
+        private readonly ILogger<ReportMatchingBackgroundJob> _logger;
+
+        public ReportMatchingBackgroundJob(
+            IReportRepository reportRepository,
+            CategoryManager categoryManager,
+            MatchManager matchManager,
+            IEmbeddingProvider embeddingProvider,
+            IItemClassificationProvider classificationProvider,
+            IBlobContainer<ReportImageContainer> imageContainer,
+            IConfiguration configuration,
+            ILogger<ReportMatchingBackgroundJob> logger)
+        {
+            _reportRepository = reportRepository;
+            _categoryManager = categoryManager;
+            _matchManager = matchManager;
+            _embeddingProvider = embeddingProvider;
+            _classificationProvider = classificationProvider;
+            _imageContainer = imageContainer;
+            _configuration = configuration;
+            _logger = logger;
+        }
+
+        public override async Task ExecuteAsync(ReportMatchingBackgroundJobArgs args)
+        {
+            var report = await _reportRepository.FindAsync(args.ReportId);
+            if (report == null)
+            {
+                return;
+            }
+
+            try
+            {
+                byte[]? imageBytes = null;
+                if (!string.IsNullOrWhiteSpace(report.ImagePath) && await _imageContainer.ExistsAsync(report.ImagePath))
+                {
+                    imageBytes = await _imageContainer.GetAllBytesAsync(report.ImagePath);
+                }
+
+                // ---- Step 1: AI Classification (replaces manual Category) ----
+                var classification = await _classificationProvider.ClassifyAsync(report.Description, imageBytes);
+
+                Guid? categoryId = null;
+                if (!string.IsNullOrWhiteSpace(classification.CategoryName))
+                {
+                    var category = await _categoryManager.FindOrCreateByNameAsync(classification.CategoryName!);
+                    categoryId = category.Id;
+                }
+
+                report.ApplyAiClassification(
+                    categoryId,
+                    classification.ObjectType,
+                    classification.Color,
+                    classification.Brand,
+                    classification.Tags
+                );
+
+                // ---- Step 2: Text embedding (enriched by classification) ----
+                var text = report.BuildEmbeddingText(classification.CategoryName);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    var textEmbedding = await _embeddingProvider.GenerateEmbeddingAsync(text);
+                    report.SetEmbedding(textEmbedding);
+                }
+
+                // ---- Step 3: Image embedding (caption-then-embed) ----
+                if (imageBytes != null)
+                {
+                    var imageEmbedding = await _embeddingProvider.GenerateImageEmbeddingAsync(imageBytes);
+                    report.SetImageEmbedding(imageEmbedding);
+                }
+
+                await _reportRepository.UpdateAsync(report);
+
+                // ---- Step 4: Find Similar Reports + Create Match + Notify ----
+                var threshold = _configuration.GetValue<double?>("LostFound:AI:MatchThreshold") ?? 75.0;
+
+                var createdCount = await _matchManager.FindAndCreateMatchesAsync(
+                    report.Id,
+                    threshold,
+                    _embeddingProvider.ProviderName
+                );
+
+                _logger.LogInformation(
+                    "AI pipeline for Report {ReportId} via {Provider}: classified as '{Category}' / '{ObjectType}', {Count} match(es) created.",
+                    report.Id,
+                    _embeddingProvider.ProviderName,
+                    classification.CategoryName,
+                    classification.ObjectType,
+                    createdCount
+                );
+            }
+            catch (Exception ex)
+            {
+                // Never let a matching failure break report creation - it
+                // already succeeded and was enqueued asynchronously.
+                _logger.LogWarning(ex, "AI pipeline failed for Report {ReportId}.", report.Id);
+            }
+        }
+    }
+
+    // Blob container marker for report images - adjust to whatever
+    // container/provider (Azure/S3/FileSystem) is already configured for
+    // this module's image uploads.
+    public class ReportImageContainer
+    {
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\BackgroundJobs\ReportMatchingBackgroundJobArgs.cs" -Value @'
+using System;
+
+namespace LostFound.BackgroundJobs
+{
+    [Serializable]
+    public class ReportMatchingBackgroundJobArgs
+    {
+        public Guid ReportId { get; set; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Categories\CategoryAppService.cs" -Value @'
+using System;
+using System.Linq;
+using System.Linq.Dynamic.Core;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Categories.Dtos;
+
+namespace LostFound.Categories
+{
+    // Manual/admin CRUD - Categories are normally created automatically by
+    // CategoryManager.FindOrCreateByNameAsync during AI classification.
+    public class CategoryAppService : ApplicationService, ICategoryAppService
+    {
+        private readonly ICategoryRepository _categoryRepository;
+
+        public CategoryAppService(ICategoryRepository categoryRepository)
+        {
+            _categoryRepository = categoryRepository;
+        }
+
+        public async Task<CategoryDto> GetAsync(Guid id)
+        {
+            var category = await _categoryRepository.GetAsync(id);
+            return ObjectMapper.Map<Category, CategoryDto>(category);
+        }
+
+        public async Task<PagedResultDto<CategoryDto>> GetListAsync(PagedAndSortedResultRequestDto input)
+        {
+            var queryable = await _categoryRepository.GetQueryableAsync();
+            var totalCount = queryable.Count();
+            var sorting = string.IsNullOrWhiteSpace(input.Sorting) ? "Name" : input.Sorting;
+
+            var categories = await AsyncExecuter.ToListAsync(
+                queryable.OrderBy(sorting).Skip(input.SkipCount).Take(input.MaxResultCount)
+            );
+
+            return new PagedResultDto<CategoryDto>(
+                totalCount,
+                ObjectMapper.Map<System.Collections.Generic.List<Category>, System.Collections.Generic.List<CategoryDto>>(categories)
+            );
+        }
+
+        public async Task<CategoryDto> CreateAsync(CreateUpdateCategoryDto input)
+        {
+            var category = new Category(GuidGenerator.Create(), input.Name, input.Icon);
+            await _categoryRepository.InsertAsync(category);
+            return ObjectMapper.Map<Category, CategoryDto>(category);
+        }
+
+        public async Task<CategoryDto> UpdateAsync(Guid id, CreateUpdateCategoryDto input)
+        {
+            var category = await _categoryRepository.GetAsync(id);
+            category.SetName(input.Name);
+            category.SetIcon(input.Icon);
+            await _categoryRepository.UpdateAsync(category);
+            return ObjectMapper.Map<Category, CategoryDto>(category);
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            await _categoryRepository.DeleteAsync(id);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Locations\LocationAppService.cs" -Value @'
+using System;
+using System.Linq;
+using System.Linq.Dynamic.Core;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Locations.Dtos;
+
+namespace LostFound.Locations
+{
+    public class LocationAppService : ApplicationService, ILocationAppService
+    {
+        private readonly ILocationRepository _locationRepository;
+
+        public LocationAppService(ILocationRepository locationRepository)
+        {
+            _locationRepository = locationRepository;
+        }
+
+        public async Task<LocationDto> GetAsync(Guid id)
+        {
+            var location = await _locationRepository.GetAsync(id);
+            return ObjectMapper.Map<Location, LocationDto>(location);
+        }
+
+        public async Task<PagedResultDto<LocationDto>> GetListAsync(PagedAndSortedResultRequestDto input)
+        {
+            var queryable = await _locationRepository.GetQueryableAsync();
+            var totalCount = queryable.Count();
+            var sorting = string.IsNullOrWhiteSpace(input.Sorting) ? "PlaceName" : input.Sorting;
+
+            var locations = await AsyncExecuter.ToListAsync(
+                queryable.OrderBy(sorting).Skip(input.SkipCount).Take(input.MaxResultCount)
+            );
+
+            return new PagedResultDto<LocationDto>(
+                totalCount,
+                ObjectMapper.Map<System.Collections.Generic.List<Location>, System.Collections.Generic.List<LocationDto>>(locations)
+            );
+        }
+
+        public async Task<LocationDto> CreateAsync(CreateUpdateLocationDto input)
+        {
+            var location = new Location(GuidGenerator.Create(), input.PlaceName);
+            await _locationRepository.InsertAsync(location);
+            return ObjectMapper.Map<Location, LocationDto>(location);
+        }
+
+        public async Task<LocationDto> UpdateAsync(Guid id, CreateUpdateLocationDto input)
+        {
+            var location = await _locationRepository.GetAsync(id);
+            location.SetPlaceName(input.PlaceName);
+            await _locationRepository.UpdateAsync(location);
+            return ObjectMapper.Map<Location, LocationDto>(location);
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            await _locationRepository.DeleteAsync(id);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\LostFoundModuleMappers.cs" -Value @'
+using Riok.Mapperly.Abstractions;
+using Volo.Abp.Mapperly;
+using LostFound.Categories;
+using LostFound.Categories.Dtos;
+using LostFound.Locations;
+using LostFound.Locations.Dtos;
+using LostFound.Reporters;
+using LostFound.Reporters.Dtos;
+using LostFound.Notifications;
+using LostFound.Notifications.Dtos;
+using LostFound.Matches;
+using LostFound.Matches.Dtos;
+
+namespace LostFound
+{
+    [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
+    public partial class LostFoundCategoryToCategoryDtoMapper : MapperBase<Category, CategoryDto>
+    {
+        public override partial CategoryDto Map(Category source);
+        public override partial void Map(Category source, CategoryDto destination);
+    }
+
+    [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
+    public partial class LostFoundLocationToLocationDtoMapper : MapperBase<Location, LocationDto>
+    {
+        public override partial LocationDto Map(Location source);
+        public override partial void Map(Location source, LocationDto destination);
+    }
+
+    [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
+    public partial class LostFoundReporterToReporterDtoMapper : MapperBase<Reporter, ReporterDto>
+    {
+        public override partial ReporterDto Map(Reporter source);
+        public override partial void Map(Reporter source, ReporterDto destination);
+    }
+
+    [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
+    public partial class LostFoundNotificationToNotificationDtoMapper : MapperBase<Notification, NotificationDto>
+    {
+        public override partial NotificationDto Map(Notification source);
+        public override partial void Map(Notification source, NotificationDto destination);
+    }
+
+    [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
+    public partial class LostFoundMatchToMatchDtoMapper : MapperBase<Match, MatchDto>
+    {
+        public override partial MatchDto Map(Match source);
+        public override partial void Map(Match source, MatchDto destination);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Matches\MatchAppService.cs" -Value @'
+using System;
+using System.Linq;
+using System.Linq.Dynamic.Core;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Matches.Dtos;
+
+namespace LostFound.Matches
+{
+    public class MatchAppService : ApplicationService, IMatchAppService
+    {
+        private readonly IMatchRepository _matchRepository;
+        private readonly MatchManager _matchManager;
+
+        public MatchAppService(IMatchRepository matchRepository, MatchManager matchManager)
+        {
+            _matchRepository = matchRepository;
+            _matchManager = matchManager;
+        }
+
+        public async Task<PagedResultDto<MatchDto>> GetListAsync(PagedAndSortedResultRequestDto input)
+        {
+            var queryable = await _matchRepository.GetQueryableAsync();
+            var totalCount = queryable.Count();
+            var sorting = string.IsNullOrWhiteSpace(input.Sorting) ? "CreationTime desc" : input.Sorting;
+
+            var matches = await AsyncExecuter.ToListAsync(
+                queryable.OrderBy(sorting).Skip(input.SkipCount).Take(input.MaxResultCount)
+            );
+
+            return new PagedResultDto<MatchDto>(totalCount, matches.Select(MapToDto).ToList());
+        }
+
+        public async Task<MatchDto> AcceptAsync(Guid id)
+        {
+            var match = await _matchRepository.GetAsync(id);
+            match.Accept();
+            await _matchRepository.UpdateAsync(match);
+
+            await _matchManager.NotifyMatchDecisionAsync(match, accepted: true);
+
+            return MapToDto(match);
+        }
+
+        public async Task<MatchDto> RejectAsync(Guid id)
+        {
+            var match = await _matchRepository.GetAsync(id);
+            match.Reject();
+            await _matchRepository.UpdateAsync(match);
+
+            await _matchManager.NotifyMatchDecisionAsync(match, accepted: false);
+
+            return MapToDto(match);
+        }
+
+        private static MatchDto MapToDto(Match match)
+        {
+            return new MatchDto
+            {
+                Id = match.Id,
+                CreationTime = match.CreationTime,
+                LastModificationTime = match.LastModificationTime,
+                LostReportId = match.LostReportId,
+                FoundReportId = match.FoundReportId,
+                SimilarityScore = match.SimilarityScore,
+                MatchReason = match.MatchReason,
+                Status = match.Status,
+                IsAutoGenerated = match.IsAutoGenerated
+            };
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Notifications\NotificationAppService.cs" -Value @'
+using System;
+using System.Linq;
+using System.Linq.Dynamic.Core;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Notifications.Dtos;
+
+namespace LostFound.Notifications
+{
+    public class NotificationAppService : ApplicationService, INotificationAppService
+    {
+        private readonly INotificationRepository _notificationRepository;
+
+        public NotificationAppService(INotificationRepository notificationRepository)
+        {
+            _notificationRepository = notificationRepository;
+        }
+
+        public async Task<PagedResultDto<NotificationDto>> GetListAsync(Guid reporterId, PagedAndSortedResultRequestDto input)
+        {
+            var queryable = (await _notificationRepository.GetQueryableAsync())
+                .Where(n => n.ReporterId == reporterId);
+
+            var totalCount = queryable.Count();
+            var sorting = string.IsNullOrWhiteSpace(input.Sorting) ? "CreationTime desc" : input.Sorting;
+
+            var notifications = await AsyncExecuter.ToListAsync(
+                queryable.OrderBy(sorting).Skip(input.SkipCount).Take(input.MaxResultCount)
+            );
+
+            return new PagedResultDto<NotificationDto>(
+                totalCount,
+                ObjectMapper.Map<System.Collections.Generic.List<Notification>, System.Collections.Generic.List<NotificationDto>>(notifications)
+            );
+        }
+
+        public async Task<NotificationDto> CreateAsync(CreateNotificationDto input)
+        {
+            var notification = new Notification(GuidGenerator.Create(), input.ReporterId, input.ReportId, input.Title, input.Message);
+            await _notificationRepository.InsertAsync(notification);
+            return ObjectMapper.Map<Notification, NotificationDto>(notification);
+        }
+
+        public async Task MarkAsReadAsync(Guid id)
+        {
+            var notification = await _notificationRepository.GetAsync(id);
+            notification.MarkAsRead();
+            await _notificationRepository.UpdateAsync(notification);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Products\LostFoundProductMappers.cs" -Value @'
+using Riok.Mapperly.Abstractions;
+using Volo.Abp.Mapperly;
+using LostFound.Products;
+using LostFound.Products.Dtos;
+
+namespace LostFound.Products
+{
+    // NOTE (DDD Option A): Product has an internal constructor, so there is
+    // intentionally NO CreateUpdateProductDto -> Product mapper here.
+    [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
+    public partial class LostFoundProductToProductDtoMapper : MapperBase<Product, ProductDto>
+    {
+        public override partial ProductDto Map(Product source);
+        public override partial void Map(Product source, ProductDto destination);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Products\ProductAppService.cs" -Value @'
+using System;
+using System.IO;
+using System.Linq;
+using System.Linq.Dynamic.Core;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Caching.Distributed;
+using MiniExcelLibs;
+using Volo.Abp;
+using Volo.Abp.Application.Services;
+using Volo.Abp.Authorization;
+using Volo.Abp.Caching;
+using Volo.Abp.Content;
+using LostFound.Products.Dtos;
+
+namespace LostFound.Products
+{
+    public class ProductAppService :
+        CrudAppService<
+            Product,
+            ProductDto,
+            Guid,
+            GetProductListDto,
+            CreateUpdateProductDto,
+            CreateUpdateProductDto>,
+        IProductAppService
+    {
+        private readonly IProductRepository _productRepository;
+        private readonly ProductManager _productManager;
+        private readonly IDistributedCache<ProductExcelDownloadTokenCacheItem, string> _excelDownloadTokenCache;
+
+        public ProductAppService(
+            IProductRepository productRepository,
+            ProductManager productManager,
+            IDistributedCache<ProductExcelDownloadTokenCacheItem, string> excelDownloadTokenCache)
+            : base(productRepository)
+        {
+            _productRepository = productRepository;
+            _productManager = productManager;
+            _excelDownloadTokenCache = excelDownloadTokenCache;
+
+            // TODO: once LostFoundPermissions.Products.* exist, wire them up:
+            //   GetPolicyName = LostFoundPermissions.Products.Default;
+            //   GetListPolicyName = LostFoundPermissions.Products.Default;
+            //   CreatePolicyName = LostFoundPermissions.Products.Create;
+            //   UpdatePolicyName = LostFoundPermissions.Products.Edit;
+            //   DeletePolicyName = LostFoundPermissions.Products.Delete;
+        }
+
+        // Option A (DDD): Mapperly cannot build a Product from a Dto (internal
+        // ctor), so creation always goes through ProductManager.
+        public override async Task<ProductDto> CreateAsync(CreateUpdateProductDto input)
+        {
+            var product = await _productManager.CreateAsync(
+                input.Name,
+                input.Price,
+                input.Description,
+                input.Status
+            );
+
+            await _productRepository.InsertAsync(product);
+
+            return await MapToGetOutputDtoAsync(product);
+        }
+
+        public override async Task<ProductDto> UpdateAsync(Guid id, CreateUpdateProductDto input)
+        {
+            var product = await _productRepository.GetAsync(id);
+
+            await _productManager.UpdateAsync(
+                product,
+                input.Name,
+                input.Price,
+                input.Description,
+                input.Status
+            );
+
+            await _productRepository.UpdateAsync(product);
+
+            return await MapToGetOutputDtoAsync(product);
+        }
+
+        protected override async Task<IQueryable<Product>> CreateFilteredQueryAsync(GetProductListDto input)
+        {
+            var queryable = await base.CreateFilteredQueryAsync(input);
+
+            return queryable
+                .WhereIf(
+                    !string.IsNullOrWhiteSpace(input.Filter),
+                    p => p.Name.Contains(input.Filter!)
+                )
+                .WhereIf(
+                    input.Status.HasValue,
+                    p => p.Status == input.Status!.Value
+                )
+                .WhereIf(
+                    input.MinPrice.HasValue,
+                    p => p.Price >= input.MinPrice!.Value
+                )
+                .WhereIf(
+                    input.MaxPrice.HasValue,
+                    p => p.Price <= input.MaxPrice!.Value
+                );
+        }
+
+        [AllowAnonymous]
+        public virtual async Task<IRemoteStreamContent> GetListAsExcelFileAsync(ProductExcelDownloadDto input)
+        {
+            var cacheItem = await _excelDownloadTokenCache.GetAsync(input.DownloadToken);
+            if (cacheItem == null)
+            {
+                throw new AbpAuthorizationException("Invalid or expired download token.");
+            }
+
+            var sorting = string.IsNullOrWhiteSpace(input.Sorting) ? "Name" : input.Sorting;
+
+            var queryable = await _productRepository.GetQueryableAsync();
+            var products = await AsyncExecuter.ToListAsync(queryable.OrderBy(sorting));
+
+            var excelItems = products
+                .Select(p => new ProductExcelDto
+                {
+                    Name = p.Name,
+                    Description = p.Description,
+                    Price = p.Price,
+                    Status = p.Status.ToString(),
+                    CreationTime = p.CreationTime
+                })
+                .ToList();
+
+            var memoryStream = new MemoryStream();
+            await MiniExcel.SaveAsAsync(memoryStream, excelItems);
+            memoryStream.Seek(0, SeekOrigin.Begin);
+
+            return new RemoteStreamContent(memoryStream, "Products.xlsx");
+        }
+
+        public virtual async Task<ProductDownloadTokenResultDto> GetDownloadTokenAsync()
+        {
+            var token = Guid.NewGuid().ToString("N");
+
+            await _excelDownloadTokenCache.SetAsync(
+                token,
+                new ProductExcelDownloadTokenCacheItem(token),
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(3)
+                }
+            );
+
+            return new ProductDownloadTokenResultDto { Token = token };
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Products\ProductExcelDownloadTokenCacheItem.cs" -Value @'
+using System;
+
+namespace LostFound.Products
+{
+    [Serializable]
+    public class ProductExcelDownloadTokenCacheItem
+    {
+        public string Token { get; set; } = string.Empty;
+
+        public ProductExcelDownloadTokenCacheItem()
+        {
+        }
+
+        public ProductExcelDownloadTokenCacheItem(string token)
+        {
+            Token = token;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Reporters\ReporterAppService.cs" -Value @'
+using System;
+using System.Linq;
+using System.Linq.Dynamic.Core;
+using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using LostFound.Reporters.Dtos;
+
+namespace LostFound.Reporters
+{
+    public class ReporterAppService : ApplicationService, IReporterAppService
+    {
+        private readonly IReporterRepository _reporterRepository;
+        private readonly ReporterManager _reporterManager;
+
+        public ReporterAppService(
+            IReporterRepository reporterRepository,
+            ReporterManager reporterManager)
+        {
+            _reporterRepository = reporterRepository;
+            _reporterManager = reporterManager;
+        }
+
+        public async Task<ReporterDto> GetAsync(Guid id)
+        {
+            var reporter = await _reporterRepository.GetAsync(id);
+            return ObjectMapper.Map<Reporter, ReporterDto>(reporter);
+        }
+
+        public async Task<PagedResultDto<ReporterDto>> GetListAsync(PagedAndSortedResultRequestDto input)
+        {
+            var queryable = await _reporterRepository.GetQueryableAsync();
+            var totalCount = queryable.Count();
+            var sorting = string.IsNullOrWhiteSpace(input.Sorting) ? "CreationTime desc" : input.Sorting;
+
+            var reporters = await AsyncExecuter.ToListAsync(
+                queryable.OrderBy(sorting).Skip(input.SkipCount).Take(input.MaxResultCount)
+            );
+
+            return new PagedResultDto<ReporterDto>(
+                totalCount,
+                ObjectMapper.Map<System.Collections.Generic.List<Reporter>, System.Collections.Generic.List<ReporterDto>>(reporters)
+            );
+        }
+
+        public async Task<ReporterDto> CreateAsync(CreateReporterDto input)
+        {
+            var reporter = await _reporterManager.FindOrCreateForGuestAsync(
+                input.Name,
+                input.Phone,
+                input.Email,
+                input.PreferredContact
+            );
+
+            return ObjectMapper.Map<Reporter, ReporterDto>(reporter);
+        }
+
+        public async Task<ReporterDto> UpdateAsync(Guid id, UpdateReporterDto input)
+        {
+            var reporter = await _reporterRepository.GetAsync(id);
+
+            await _reporterManager.UpdateContactInfoAsync(
+                reporter,
+                input.Name,
+                input.Email,
+                input.PreferredContact
+            );
+
+            await _reporterRepository.UpdateAsync(reporter);
+
+            return ObjectMapper.Map<Reporter, ReporterDto>(reporter);
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            await _reporterRepository.DeleteAsync(id);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Application\Reports\ReportAppService.cs" -Value @'
+using System;
+using System.Linq;
+using System.Linq.Dynamic.Core;
+using System.Threading.Tasks;
+using Volo.Abp;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using Volo.Abp.BackgroundJobs;
+using LostFound.Reports.Dtos;
+using LostFound.Reporters;
+using LostFound.BackgroundJobs;
+
+namespace LostFound.Reports
+{
+    // CRUD only. No CategoryId/Color anywhere - AI fills those in
+    // asynchronously after Create/Update via the background job.
+    public class ReportAppService : ApplicationService, IReportAppService
+    {
+        private readonly IReportRepository _reportRepository;
+        private readonly ReporterManager _reporterManager;
+        private readonly IBackgroundJobManager _backgroundJobManager;
+
+        public ReportAppService(
+            IReportRepository reportRepository,
+            ReporterManager reporterManager,
+            IBackgroundJobManager backgroundJobManager)
+        {
+            _reportRepository = reportRepository;
+            _reporterManager = reporterManager;
+            _backgroundJobManager = backgroundJobManager;
+        }
+
+        public async Task<ReportDto> GetAsync(Guid id)
+        {
+            var report = await _reportRepository.GetAsync(id);
+            return MapToDto(report);
+        }
+
+        public async Task<PagedResultDto<ReportDto>> GetListAsync(GetReportListDto input)
+        {
+            var queryable = await _reportRepository.GetQueryableAsync();
+
+            queryable = queryable
+                .WhereIf(!string.IsNullOrWhiteSpace(input.Filter), r =>
+                    (r.Description != null && r.Description.Contains(input.Filter!)) ||
+                    (r.LocationDetails != null && r.LocationDetails.Contains(input.Filter!)))
+                .WhereIf(input.Type.HasValue, r => r.Type == input.Type!.Value)
+                .WhereIf(input.Status.HasValue, r => r.Status == input.Status!.Value)
+                .WhereIf(input.LocationId.HasValue, r => r.LocationId == input.LocationId!.Value)
+                .WhereIf(input.ReporterId.HasValue, r => r.ReporterId == input.ReporterId!.Value)
+                .WhereIf(input.CategoryId.HasValue, r => r.CategoryId == input.CategoryId!.Value);
+
+            var totalCount = queryable.Count();
+            var sorting = string.IsNullOrWhiteSpace(input.Sorting) ? "CreationTime desc" : input.Sorting;
+
+            var reports = await AsyncExecuter.ToListAsync(
+                queryable.OrderBy(sorting).Skip(input.SkipCount).Take(input.MaxResultCount)
+            );
+
+            return new PagedResultDto<ReportDto>(totalCount, reports.Select(MapToDto).ToList());
+        }
+
+        // Workflow: Save Report (no Category) -> Queue Background Job -> AI
+        // Classification -> Embeddings -> Matching -> Notification.
+        public async Task<ReportDto> CreateAsync(CreateReportDto input)
+        {
+            Reporter reporter;
+
+            if (CurrentUser.IsAuthenticated)
+            {
+                reporter = await _reporterManager.FindOrCreateForIdentityUserAsync(
+                    CurrentUser.Id!.Value,
+                    input.ReporterName ?? CurrentUser.Name,
+                    input.ReporterPhone ?? CurrentUser.PhoneNumber ?? string.Empty,
+                    input.ReporterEmail ?? CurrentUser.Email,
+                    input.PreferredContact
+                );
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(input.ReporterPhone))
+                {
+                    throw new BusinessException(ReporterErrorCodes.PhoneIsRequiredForGuests);
+                }
+
+                reporter = await _reporterManager.FindOrCreateForGuestAsync(
+                    input.ReporterName,
+                    input.ReporterPhone,
+                    input.ReporterEmail,
+                    input.PreferredContact
+                );
+            }
+
+            var report = new Report(
+                GuidGenerator.Create(),
+                reporter.Id,
+                input.LocationId,
+                input.Type,
+                input.Description,
+                input.LocationDetails,
+                input.LostFoundDate,
+                input.ImagePath,
+                input.IsItemWithFinder,
+                input.PickupLocation
+            );
+
+            await _reportRepository.InsertAsync(report);
+
+            await _backgroundJobManager.EnqueueAsync(new ReportMatchingBackgroundJobArgs { ReportId = report.Id });
+
+            return MapToDto(report);
+        }
+
+        public async Task<ReportDto> UpdateAsync(Guid id, UpdateReportDto input)
+        {
+            var report = await _reportRepository.GetAsync(id);
+            var previousDescription = report.Description;
+            var previousImagePath = report.ImagePath;
+            var previousLocationDetails = report.LocationDetails;
+
+            report.SetStatus(input.Status);
+            report.UpdateDetails(
+                input.Description,
+                input.LocationDetails,
+                input.LostFoundDate,
+                input.ImagePath,
+                input.IsItemWithFinder,
+                input.PickupLocation
+            );
+
+            await _reportRepository.UpdateAsync(report);
+
+            if (previousDescription != input.Description ||
+                previousImagePath != input.ImagePath ||
+                previousLocationDetails != input.LocationDetails)
+            {
+                await _backgroundJobManager.EnqueueAsync(new ReportMatchingBackgroundJobArgs { ReportId = report.Id });
+            }
+
+            return MapToDto(report);
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            await _reportRepository.DeleteAsync(id);
+        }
+
+        // Report mapping is manual (not via Mapperly) because of the AI-only
+        // derived fields (AiTags via GetAiTags(), HasEmbedding, etc.).
+        private static ReportDto MapToDto(Report report)
+        {
+            return new ReportDto
+            {
+                Id = report.Id,
+                CreationTime = report.CreationTime,
+                LastModificationTime = report.LastModificationTime,
+                ReporterId = report.ReporterId,
+                CategoryId = report.CategoryId,
+                LocationId = report.LocationId,
+                LocationDetails = report.LocationDetails,
+                Type = report.Type,
+                Description = report.Description,
+                LostFoundDate = report.LostFoundDate,
+                ImagePath = report.ImagePath,
+                IsItemWithFinder = report.IsItemWithFinder,
+                PickupLocation = report.PickupLocation,
+                Status = report.Status,
+                HasEmbedding = report.HasEmbedding,
+                Color = report.Color,
+                AiObjectType = report.AiObjectType,
+                AiBrand = report.AiBrand,
+                AiTags = report.GetAiTags(),
+                IsAiClassified = report.IsAiClassified
+            };
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Categories\CategoryConsts.cs" -Value @'
+namespace LostFound.Categories
+{
+    public static class CategoryConsts
+    {
+        public const int MaxNameLength = 128;
+        public const int MaxIconLength = 64;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Locations\LocationConsts.cs" -Value @'
+namespace LostFound.Locations
+{
+    public static class LocationConsts
+    {
+        public const int MaxPlaceNameLength = 256;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Matches\MatchConsts.cs" -Value @'
+namespace LostFound.Matches
+{
+    public static class MatchConsts
+    {
+        public const int MaxStatusLength = 32;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Matches\MatchStatus.cs" -Value @'
+namespace LostFound.Matches
+{
+    public enum MatchStatus : byte
+    {
+        Pending = 0,
+        Accepted = 1,
+        Rejected = 2
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Notifications\NotificationConsts.cs" -Value @'
+namespace LostFound.Notifications
+{
+    public static class NotificationConsts
+    {
+        public const int MaxTitleLength = 128;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Products\ProductConsts.cs" -Value @'
+namespace LostFound.Products
+{
+    public static class ProductConsts
+    {
+        public const int MinNameLength = 2;
+        public const int MaxNameLength = 128;
+        public const int MaxDescriptionLength = 2000;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Products\ProductErrorCodes.cs" -Value @'
+namespace LostFound.Products
+{
+    public static class ProductErrorCodes
+    {
+        private const string Prefix = "LostFound:Product:";
+
+        public const string ProductNotFound = Prefix + "0001";
+        public const string DuplicateProductName = Prefix + "0002";
+        public const string InvalidPrice = Prefix + "0003";
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Products\ProductStatus.cs" -Value @'
+namespace LostFound.Products
+{
+    public enum ProductStatus : byte
+    {
+        Draft = 0,
+        Active = 1,
+        Inactive = 2
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Reporters\PreferredContactType.cs" -Value @'
+namespace LostFound.Reporters
+{
+    public enum PreferredContactType : byte
+    {
+        Phone = 0,
+        Email = 1,
+        WhatsApp = 2
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Reporters\ReporterConsts.cs" -Value @'
+namespace LostFound.Reporters
+{
+    public static class ReporterConsts
+    {
+        public const int MaxNameLength = 128;
+        public const int MinNameLength = 2;
+        public const int MaxPhoneLength = 32;
+        public const int MaxEmailLength = 256;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Reporters\ReporterErrorCodes.cs" -Value @'
+namespace LostFound.Reporters
+{
+    public static class ReporterErrorCodes
+    {
+        private const string Prefix = "LostFound:Reporter:";
+
+        public const string PhoneIsRequiredForGuests = Prefix + "0001";
+        public const string ReporterNotFound = Prefix + "0002";
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Reports\ReportConsts.cs" -Value @'
+namespace LostFound.Reports
+{
+    public static class ReportConsts
+    {
+        public const int MaxColorLength = 32;
+        public const int MaxImagePathLength = 512;
+        public const int MaxPickupLocationLength = 256;
+        public const int MaxLocationDetailsLength = 256;
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Reports\ReportStatus.cs" -Value @'
+namespace LostFound.Reports
+{
+    public enum ReportStatus : byte
+    {
+        Open = 0,
+        Matched = 1,
+        Closed = 2
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain.Shared\Reports\ReportType.cs" -Value @'
+namespace LostFound.Reports
+{
+    public enum ReportType : byte
+    {
+        Lost = 0,
+        Found = 1
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Categories\Category.cs" -Value @'
+using System;
+using Volo.Abp;
+using Volo.Abp.Domain.Entities.Auditing;
+
+namespace LostFound.Categories
+{
+    public class Category : FullAuditedAggregateRoot<Guid>
+    {
+        public virtual string Name { get; private set; }
+
+        public virtual string? Icon { get; private set; }
+
+        protected Category()
+        {
+            Name = string.Empty;
+        }
+
+        public Category(Guid id, string name, string? icon = null) : base(id)
+        {
+            Name = string.Empty;
+            SetName(name);
+            SetIcon(icon);
+        }
+
+        public Category SetName(string name)
+        {
+            Name = Check.NotNullOrWhiteSpace(name, nameof(name), maxLength: CategoryConsts.MaxNameLength);
+            return this;
+        }
+
+        public Category SetIcon(string? icon)
+        {
+            Icon = Check.Length(icon, nameof(icon), maxLength: CategoryConsts.MaxIconLength);
+            return this;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Categories\CategoryManager.cs" -Value @'
+using System.Threading.Tasks;
+using Volo.Abp;
+using Volo.Abp.Domain.Services;
+
+namespace LostFound.Categories
+{
+    // Resolves the category NAME the AI returned (it has no idea about our
+    // Guid ids) into a real Category - reusing an existing one
+    // case-insensitively, or creating a new one on the fly. Categories are
+    // purely internal metadata now (analytics/reporting), never a required
+    // user input.
+    public class CategoryManager : DomainService
+    {
+        private readonly ICategoryRepository _categoryRepository;
+
+        public CategoryManager(ICategoryRepository categoryRepository)
+        {
+            _categoryRepository = categoryRepository;
+        }
+
+        public async Task<Category> FindOrCreateByNameAsync(string name)
+        {
+            Check.NotNullOrWhiteSpace(name, nameof(name));
+
+            var normalized = name.Trim();
+
+            var existing = await _categoryRepository.FindByNameAsync(normalized);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var category = new Category(GuidGenerator.Create(), normalized);
+            await _categoryRepository.InsertAsync(category);
+            return category;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Categories\ICategoryRepository.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Domain.Repositories;
+
+namespace LostFound.Categories
+{
+    public interface ICategoryRepository : IRepository<Category, Guid>
+    {
+        Task<Category?> FindByNameAsync(string name);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Locations\ILocationRepository.cs" -Value @'
+using System;
+using Volo.Abp.Domain.Repositories;
+
+namespace LostFound.Locations
+{
+    public interface ILocationRepository : IRepository<Location, Guid>
+    {
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Locations\Location.cs" -Value @'
+using System;
+using Volo.Abp;
+using Volo.Abp.Domain.Entities.Auditing;
+
+namespace LostFound.Locations
+{
+    public class Location : FullAuditedAggregateRoot<Guid>
+    {
+        public virtual string PlaceName { get; private set; }
+
+        protected Location()
+        {
+            PlaceName = string.Empty;
+        }
+
+        public Location(Guid id, string placeName) : base(id)
+        {
+            PlaceName = string.Empty;
+            SetPlaceName(placeName);
+        }
+
+        public Location SetPlaceName(string placeName)
+        {
+            PlaceName = Check.NotNullOrWhiteSpace(placeName, nameof(placeName), maxLength: LocationConsts.MaxPlaceNameLength);
+            return this;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Matches\IMatchRepository.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Domain.Repositories;
+
+namespace LostFound.Matches
+{
+    public interface IMatchRepository : IRepository<Match, Guid>
+    {
+        Task<bool> ExistsForPairAsync(Guid lostReportId, Guid foundReportId);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Matches\Match.cs" -Value @'
+using System;
+using Volo.Abp.Domain.Entities.Auditing;
+
+namespace LostFound.Matches
+{
+    public class Match : FullAuditedAggregateRoot<Guid>
+    {
+        public virtual Guid LostReportId { get; private set; }
+
+        public virtual Guid FoundReportId { get; private set; }
+
+        // 0-100 percentage (AI semantic similarity, text+image combined).
+        public virtual decimal? SimilarityScore { get; private set; }
+
+        public virtual string? MatchReason { get; private set; }
+
+        public virtual MatchStatus Status { get; private set; }
+
+        public virtual bool IsAutoGenerated { get; private set; }
+
+        protected Match()
+        {
+        }
+
+        public Match(
+            Guid id,
+            Guid lostReportId,
+            Guid foundReportId,
+            decimal? similarityScore,
+            string? matchReason,
+            MatchStatus status = MatchStatus.Pending,
+            bool isAutoGenerated = false) : base(id)
+        {
+            LostReportId = lostReportId;
+            FoundReportId = foundReportId;
+            SimilarityScore = similarityScore;
+            MatchReason = matchReason;
+            IsAutoGenerated = isAutoGenerated;
+            Status = status;
+        }
+
+        public Match Accept()
+        {
+            Status = MatchStatus.Accepted;
+            return this;
+        }
+
+        public Match Reject()
+        {
+            Status = MatchStatus.Rejected;
+            return this;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Matches\MatchManager.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp;
+using Volo.Abp.Domain.Services;
+using LostFound.Reports;
+using LostFound.Matching;
+using LostFound.Notifications;
+
+namespace LostFound.Matches
+{
+    public class MatchManager : DomainService
+    {
+        private readonly IMatchRepository _matchRepository;
+        private readonly IReportRepository _reportRepository;
+        private readonly INotificationRepository _notificationRepository;
+
+        public MatchManager(
+            IMatchRepository matchRepository,
+            IReportRepository reportRepository,
+            INotificationRepository notificationRepository)
+        {
+            _matchRepository = matchRepository;
+            _reportRepository = reportRepository;
+            _notificationRepository = notificationRepository;
+        }
+
+        // Called by the background job AFTER the report's embedding has
+        // already been generated and saved. Category plays NO role in
+        // candidate selection or scoring. Text similarity always
+        // contributes; image similarity is blended in (60/40) when BOTH
+        // reports have an image embedding.
+        public async Task<int> FindAndCreateMatchesAsync(
+            Guid reportId,
+            double thresholdPercentage,
+            string providerNameForExplanation)
+        {
+            var report = await _reportRepository.GetAsync(reportId);
+
+            var textEmbedding = report.GetEmbeddingVector();
+            if (textEmbedding == null)
+            {
+                return 0;
+            }
+
+            var oppositeType = report.Type == ReportType.Lost ? ReportType.Found : ReportType.Lost;
+
+            var candidates = await _reportRepository.GetMatchCandidatesAsync(report.Id, oppositeType);
+
+            var createdCount = 0;
+
+            foreach (var candidate in candidates)
+            {
+                var candidateTextEmbedding = candidate.GetEmbeddingVector();
+                var textScore = CosineSimilarityCalculator.CalculatePercentage(textEmbedding, candidateTextEmbedding);
+
+                double score = textScore;
+                var imageEmbedding = report.GetImageEmbeddingVector();
+                var candidateImageEmbedding = candidate.GetImageEmbeddingVector();
+
+                if (imageEmbedding != null && candidateImageEmbedding != null)
+                {
+                    var imageScore = CosineSimilarityCalculator.CalculatePercentage(imageEmbedding, candidateImageEmbedding);
+                    score = (textScore * 0.6) + (imageScore * 0.4);
+                }
+
+                if (score < thresholdPercentage)
+                {
+                    continue;
+                }
+
+                var lostReportId = report.Type == ReportType.Lost ? report.Id : candidate.Id;
+                var foundReportId = report.Type == ReportType.Found ? report.Id : candidate.Id;
+
+                if (await _matchRepository.ExistsForPairAsync(lostReportId, foundReportId))
+                {
+                    continue;
+                }
+
+                var explanation = MatchExplanationBuilder.Build(score, providerNameForExplanation);
+
+                var match = new Match(
+                    GuidGenerator.Create(),
+                    lostReportId,
+                    foundReportId,
+                    (decimal)score,
+                    explanation,
+                    MatchStatus.Pending,
+                    isAutoGenerated: true
+                );
+
+                await _matchRepository.InsertAsync(match);
+
+                await NotifyBothReportersAsync(
+                    match,
+                    lostReportId == report.Id ? report : candidate,
+                    foundReportId == report.Id ? report : candidate,
+                    "Possible match found",
+                    $"We found a possible match with {score:0.0}% confidence. Please review it."
+                );
+
+                createdCount++;
+            }
+
+            return createdCount;
+        }
+
+        public async Task NotifyMatchDecisionAsync(Match match, bool accepted)
+        {
+            var lostReport = await _reportRepository.GetAsync(match.LostReportId);
+            var foundReport = await _reportRepository.GetAsync(match.FoundReportId);
+
+            var title = accepted ? "Match accepted" : "Match rejected";
+            var message = accepted
+                ? "Your match was confirmed by the other party."
+                : "Your match was rejected by the other party.";
+
+            await NotifyBothReportersAsync(match, lostReport, foundReport, title, message);
+        }
+
+        private async Task NotifyBothReportersAsync(Match match, Report lostReport, Report foundReport, string title, string message)
+        {
+            await _notificationRepository.InsertAsync(
+                new Notification(GuidGenerator.Create(), lostReport.ReporterId, lostReport.Id, title, message)
+            );
+
+            await _notificationRepository.InsertAsync(
+                new Notification(GuidGenerator.Create(), foundReport.ReporterId, foundReport.Id, title, message)
+            );
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Matching\CosineSimilarityCalculator.cs" -Value @'
+using System;
+
+namespace LostFound.Matching
+{
+    public static class CosineSimilarityCalculator
+    {
+        public static double CalculatePercentage(float[]? a, float[]? b)
+        {
+            if (a == null || b == null || a.Length == 0 || b.Length == 0 || a.Length != b.Length)
+            {
+                return 0;
+            }
+
+            double dot = 0, magnitudeA = 0, magnitudeB = 0;
+
+            for (var i = 0; i < a.Length; i++)
+            {
+                dot += a[i] * b[i];
+                magnitudeA += a[i] * a[i];
+                magnitudeB += b[i] * b[i];
+            }
+
+            if (magnitudeA == 0 || magnitudeB == 0)
+            {
+                return 0;
+            }
+
+            var cosine = dot / (Math.Sqrt(magnitudeA) * Math.Sqrt(magnitudeB));
+            cosine = Math.Max(-1, Math.Min(1, cosine));
+
+            return Math.Round((cosine + 1) / 2 * 100, 2);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Matching\MatchExplanationBuilder.cs" -Value @'
+namespace LostFound.Matching
+{
+    // Templated, deterministic explanation text - NOT an AI call. Keeps the
+    // Domain layer independent from any AI provider.
+    public static class MatchExplanationBuilder
+    {
+        public static string Build(double scorePercentage, string providerName)
+        {
+            string level;
+
+            if (scorePercentage >= 90)
+            {
+                level = "very high semantic similarity / تطابق دلالي عالٍ جدًا";
+            }
+            else if (scorePercentage >= 80)
+            {
+                level = "high semantic similarity / تطابق دلالي عالٍ";
+            }
+            else if (scorePercentage >= 70)
+            {
+                level = "moderate semantic similarity / تطابق دلالي متوسط";
+            }
+            else
+            {
+                level = "low semantic similarity / تطابق دلالي منخفض";
+            }
+
+            return $"AI match ({providerName}): {scorePercentage:0.00}% - {level}. Descriptions compared by meaning, not exact wording.";
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Notifications\INotificationRepository.cs" -Value @'
+using System;
+using Volo.Abp.Domain.Repositories;
+
+namespace LostFound.Notifications
+{
+    public interface INotificationRepository : IRepository<Notification, Guid>
+    {
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Notifications\Notification.cs" -Value @'
+using System;
+using Volo.Abp.Domain.Entities.Auditing;
+
+namespace LostFound.Notifications
+{
+    public class Notification : FullAuditedAggregateRoot<Guid>
+    {
+        public virtual Guid ReporterId { get; private set; }
+
+        public virtual Guid ReportId { get; private set; }
+
+        public virtual string? Title { get; private set; }
+
+        public virtual string? Message { get; private set; }
+
+        public virtual bool IsRead { get; private set; }
+
+        protected Notification()
+        {
+        }
+
+        public Notification(Guid id, Guid reporterId, Guid reportId, string? title, string? message) : base(id)
+        {
+            ReporterId = reporterId;
+            ReportId = reportId;
+            Title = title;
+            Message = message;
+            IsRead = false;
+        }
+
+        public Notification MarkAsRead()
+        {
+            IsRead = true;
+            return this;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Products\IProductRepository.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Domain.Repositories;
+
+namespace LostFound.Products
+{
+    public interface IProductRepository : IRepository<Product, Guid>
+    {
+        Task<Product?> FindByNameAsync(string name);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Products\Product.cs" -Value @'
+using System;
+using Volo.Abp;
+using Volo.Abp.Domain.Entities.Auditing;
+
+namespace LostFound.Products
+{
+    public class Product : FullAuditedAggregateRoot<Guid>
+    {
+        public virtual string Name { get; private set; }
+
+        public virtual string? Description { get; private set; }
+
+        public virtual decimal Price { get; private set; }
+
+        public virtual ProductStatus Status { get; private set; }
+
+        // Required by EF Core - do not use directly.
+        protected Product()
+        {
+            Name = string.Empty;
+        }
+
+        internal Product(
+            Guid id,
+            string name,
+            decimal price,
+            string? description = null,
+            ProductStatus status = ProductStatus.Draft) : base(id)
+        {
+            Name = string.Empty;
+            SetName(name);
+            SetPrice(price);
+            SetDescription(description);
+            Status = status;
+        }
+
+        internal Product SetName(string name)
+        {
+            Name = Check.NotNullOrWhiteSpace(
+                name,
+                nameof(name),
+                maxLength: ProductConsts.MaxNameLength,
+                minLength: ProductConsts.MinNameLength
+            );
+
+            return this;
+        }
+
+        internal Product SetDescription(string? description)
+        {
+            Description = Check.Length(
+                description,
+                nameof(description),
+                maxLength: ProductConsts.MaxDescriptionLength
+            );
+
+            return this;
+        }
+
+        internal Product SetPrice(decimal price)
+        {
+            if (price < 0)
+            {
+                throw new BusinessException(ProductErrorCodes.InvalidPrice)
+                    .WithData("Price", price);
+            }
+
+            Price = price;
+
+            return this;
+        }
+
+        internal Product SetStatus(ProductStatus status)
+        {
+            Status = status;
+
+            return this;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Products\ProductManager.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp;
+using Volo.Abp.Domain.Services;
+
+namespace LostFound.Products
+{
+    public class ProductManager : DomainService
+    {
+        private readonly IProductRepository _productRepository;
+
+        public ProductManager(IProductRepository productRepository)
+        {
+            _productRepository = productRepository;
+        }
+
+        public async Task<Product> CreateAsync(
+            string name,
+            decimal price,
+            string? description = null,
+            ProductStatus status = ProductStatus.Draft)
+        {
+            Check.NotNullOrWhiteSpace(name, nameof(name));
+
+            await EnsureNameIsUniqueAsync(name);
+
+            var product = new Product(
+                GuidGenerator.Create(),
+                name,
+                price,
+                description,
+                status
+            );
+
+            return product;
+        }
+
+        public async Task ChangeNameAsync(Product product, string name)
+        {
+            Check.NotNull(product, nameof(product));
+            Check.NotNullOrWhiteSpace(name, nameof(name));
+
+            if (string.Equals(product.Name, name, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            await EnsureNameIsUniqueAsync(name, product.Id);
+
+            product.SetName(name);
+        }
+
+        // Product.SetXxx() members are internal to the Domain assembly (by design -
+        // Rule 3), so the Application project cannot call them directly. All
+        // mutation goes through the Manager instead.
+        public async Task UpdateAsync(
+            Product product,
+            string name,
+            decimal price,
+            string? description,
+            ProductStatus status)
+        {
+            Check.NotNull(product, nameof(product));
+
+            await ChangeNameAsync(product, name);
+
+            product.SetPrice(price);
+            product.SetDescription(description);
+            product.SetStatus(status);
+        }
+
+        private async Task EnsureNameIsUniqueAsync(string name, Guid? excludedId = null)
+        {
+            var existingProduct = await _productRepository.FindByNameAsync(name);
+
+            if (existingProduct != null && existingProduct.Id != excludedId)
+            {
+                throw new BusinessException(ProductErrorCodes.DuplicateProductName)
+                    .WithData("Name", name);
+            }
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Reporters\IReporterRepository.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp.Domain.Repositories;
+
+namespace LostFound.Reporters
+{
+    public interface IReporterRepository : IRepository<Reporter, Guid>
+    {
+        Task<Reporter?> FindByIdentityUserIdAsync(Guid identityUserId);
+
+        Task<Reporter?> FindByPhoneAsync(string phone);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Reporters\Reporter.cs" -Value @'
+using System;
+using Volo.Abp;
+using Volo.Abp.Domain.Entities.Auditing;
+
+namespace LostFound.Reporters
+{
+    // Reporter is a business aggregate representing the owner of a Report,
+    // regardless of whether they are an authenticated user or a guest.
+    // It is NOT a replacement for IdentityUser - it optionally links to one
+    // via IdentityUserId (a plain Guid, no cross-module FK - see
+    // ReporterConfiguration for why).
+    public class Reporter : FullAuditedAggregateRoot<Guid>
+    {
+        public virtual Guid? IdentityUserId { get; private set; }
+
+        public virtual string? Name { get; private set; }
+
+        public virtual string Phone { get; private set; }
+
+        public virtual string? Email { get; private set; }
+
+        public virtual PreferredContactType PreferredContact { get; private set; }
+
+        protected Reporter()
+        {
+            Phone = string.Empty;
+        }
+
+        internal Reporter(
+            Guid id,
+            string phone,
+            string? name = null,
+            string? email = null,
+            PreferredContactType preferredContact = PreferredContactType.Phone,
+            Guid? identityUserId = null) : base(id)
+        {
+            Phone = string.Empty;
+            SetPhone(phone);
+            SetName(name);
+            SetEmail(email);
+            SetPreferredContact(preferredContact);
+            IdentityUserId = identityUserId;
+        }
+
+        internal Reporter SetName(string? name)
+        {
+            Name = Check.Length(name, nameof(name), maxLength: ReporterConsts.MaxNameLength);
+            return this;
+        }
+
+        internal Reporter SetPhone(string phone)
+        {
+            Phone = Check.NotNullOrWhiteSpace(
+                phone,
+                nameof(phone),
+                maxLength: ReporterConsts.MaxPhoneLength
+            );
+            return this;
+        }
+
+        internal Reporter SetEmail(string? email)
+        {
+            Email = Check.Length(email, nameof(email), maxLength: ReporterConsts.MaxEmailLength);
+            return this;
+        }
+
+        internal Reporter SetPreferredContact(PreferredContactType preferredContact)
+        {
+            PreferredContact = preferredContact;
+            return this;
+        }
+
+        internal Reporter LinkToIdentityUser(Guid identityUserId)
+        {
+            IdentityUserId = identityUserId;
+            return this;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Reporters\ReporterManager.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Volo.Abp;
+using Volo.Abp.Domain.Services;
+
+namespace LostFound.Reporters
+{
+    public class ReporterManager : DomainService
+    {
+        private readonly IReporterRepository _reporterRepository;
+
+        public ReporterManager(IReporterRepository reporterRepository)
+        {
+            _reporterRepository = reporterRepository;
+        }
+
+        public async Task<Reporter> FindOrCreateForIdentityUserAsync(
+            Guid identityUserId,
+            string? name,
+            string phone,
+            string? email,
+            PreferredContactType preferredContact = PreferredContactType.Phone)
+        {
+            var existing = await _reporterRepository.FindByIdentityUserIdAsync(identityUserId);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var existingByPhone = !string.IsNullOrWhiteSpace(phone)
+                ? await _reporterRepository.FindByPhoneAsync(phone)
+                : null;
+
+            if (existingByPhone != null)
+            {
+                existingByPhone.LinkToIdentityUser(identityUserId);
+                return existingByPhone;
+            }
+
+            var reporter = new Reporter(
+                GuidGenerator.Create(),
+                phone,
+                name,
+                email,
+                preferredContact,
+                identityUserId
+            );
+
+            await _reporterRepository.InsertAsync(reporter);
+
+            return reporter;
+        }
+
+        public async Task<Reporter> FindOrCreateForGuestAsync(
+            string? name,
+            string phone,
+            string? email,
+            PreferredContactType preferredContact = PreferredContactType.Phone)
+        {
+            if (string.IsNullOrWhiteSpace(phone))
+            {
+                throw new BusinessException(ReporterErrorCodes.PhoneIsRequiredForGuests);
+            }
+
+            var existing = await _reporterRepository.FindByPhoneAsync(phone);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var reporter = new Reporter(
+                GuidGenerator.Create(),
+                phone,
+                name,
+                email,
+                preferredContact
+            );
+
+            await _reporterRepository.InsertAsync(reporter);
+
+            return reporter;
+        }
+
+        public Task UpdateContactInfoAsync(
+            Reporter reporter,
+            string? name,
+            string? email,
+            PreferredContactType preferredContact)
+        {
+            Check.NotNull(reporter, nameof(reporter));
+
+            reporter.SetName(name);
+            reporter.SetEmail(email);
+            reporter.SetPreferredContact(preferredContact);
+
+            return Task.CompletedTask;
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Reports\IReportRepository.cs" -Value @'
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Volo.Abp.Domain.Repositories;
+
+namespace LostFound.Reports
+{
+    public interface IReportRepository : IRepository<Report, Guid>
+    {
+        Task<List<Report>> GetListByCategoryAsync(Guid categoryId);
+
+        // Category is NOT used as a filter/ranking factor for matching -
+        // candidates are simply the opposite Type, still Open, with an
+        // embedding already computed.
+        Task<List<Report>> GetMatchCandidatesAsync(Guid reportId, ReportType oppositeType);
+
+        // Used by AiSearchAppService - never regenerates embeddings, only
+        // reads what is already stored.
+        Task<List<Report>> GetSearchableReportsAsync(ReportType? type);
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.Domain\Reports\Report.cs" -Value @'
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using Volo.Abp;
+using Volo.Abp.Domain.Entities.Auditing;
+
+namespace LostFound.Reports
+{
+    public class Report : FullAuditedAggregateRoot<Guid>
+    {
+        public virtual Guid ReporterId { get; private set; }
+
+        // AI-resolved, optional - filled in later by the background job.
+        public virtual Guid? CategoryId { get; private set; }
+
+        // Required structured location reference (used for analytics/filtering).
+        public virtual Guid LocationId { get; private set; }
+
+        // Optional free-text exact-place description, e.g. "Under the stairs".
+        public virtual string? LocationDetails { get; private set; }
+
+        public virtual ReportType Type { get; private set; }
+
+        public virtual string? Description { get; private set; }
+
+        // AI-generated, not user input.
+        public virtual string? Color { get; private set; }
+
+        public virtual DateTime? LostFoundDate { get; private set; }
+
+        public virtual string? ImagePath { get; private set; }
+
+        public virtual bool IsItemWithFinder { get; private set; }
+
+        public virtual string? PickupLocation { get; private set; }
+
+        public virtual ReportStatus Status { get; private set; }
+
+        // ---- AI-generated metadata ----
+        public virtual string? AiObjectType { get; private set; }
+
+        public virtual string? AiBrand { get; private set; }
+
+        public virtual string? AiTagsJson { get; private set; }
+
+        public virtual bool IsAiClassified { get; private set; }
+
+        // ---- AI semantic search vectors ----
+        public virtual string? EmbeddingJson { get; private set; }
+
+        public virtual string? ImageEmbeddingJson { get; private set; }
+
+        protected Report()
+        {
+        }
+
+        public Report(
+            Guid id,
+            Guid reporterId,
+            Guid locationId,
+            ReportType type,
+            string? description = null,
+            string? locationDetails = null,
+            DateTime? lostFoundDate = null,
+            string? imagePath = null,
+            bool isItemWithFinder = false,
+            string? pickupLocation = null,
+            ReportStatus status = ReportStatus.Open) : base(id)
+        {
+            ReporterId = reporterId;
+            SetLocation(locationId);
+            Type = type;
+            Description = description;
+            SetLocationDetails(locationDetails);
+            LostFoundDate = lostFoundDate;
+            ImagePath = imagePath;
+            IsItemWithFinder = isItemWithFinder;
+            PickupLocation = pickupLocation;
+            Status = status;
+        }
+
+        public Report SetStatus(ReportStatus status)
+        {
+            Status = status;
+            return this;
+        }
+
+        public Report SetLocation(Guid locationId)
+        {
+            Check.NotNull(locationId, nameof(locationId));
+            LocationId = locationId;
+            return this;
+        }
+
+        public Report SetLocationDetails(string? locationDetails)
+        {
+            LocationDetails = Check.Length(locationDetails, nameof(locationDetails), maxLength: ReportConsts.MaxLocationDetailsLength);
+            return this;
+        }
+
+        public Report UpdateDetails(
+            string? description,
+            string? locationDetails,
+            DateTime? lostFoundDate,
+            string? imagePath,
+            bool isItemWithFinder,
+            string? pickupLocation)
+        {
+            Description = description;
+            SetLocationDetails(locationDetails);
+            LostFoundDate = lostFoundDate;
+            ImagePath = imagePath;
+            IsItemWithFinder = isItemWithFinder;
+            PickupLocation = pickupLocation;
+            return this;
+        }
+
+        // Called once by the background job after AI classification. Safe to
+        // call again on re-classification - always overwrites with the
+        // latest AI output.
+        public virtual Report ApplyAiClassification(
+            Guid? categoryId,
+            string? objectType,
+            string? color,
+            string? brand,
+            IEnumerable<string>? tags)
+        {
+            CategoryId = categoryId;
+            AiObjectType = objectType;
+            Color = color;
+            AiBrand = brand;
+            AiTagsJson = tags != null ? JsonSerializer.Serialize(tags) : null;
+            IsAiClassified = true;
+            return this;
+        }
+
+        public virtual List<string> GetAiTags()
+        {
+            return string.IsNullOrWhiteSpace(AiTagsJson)
+                ? new List<string>()
+                : JsonSerializer.Deserialize<List<string>>(AiTagsJson) ?? new List<string>();
+        }
+
+        // Semantic text for the TEXT embedding - Description + LocationDetails
+        // + AI classification output (object type / color / brand / tags /
+        // category), enriched once classification has run.
+        public virtual string BuildEmbeddingText(string? categoryName = null)
+        {
+            var parts = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(Description))
+            {
+                parts.Add(Description!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(LocationDetails))
+            {
+                parts.Add(LocationDetails!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(AiObjectType))
+            {
+                parts.Add(AiObjectType!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(Color))
+            {
+                parts.Add(Color!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(AiBrand))
+            {
+                parts.Add(AiBrand!);
+            }
+
+            if (!string.IsNullOrWhiteSpace(categoryName))
+            {
+                parts.Add(categoryName!);
+            }
+
+            foreach (var tag in GetAiTags())
+            {
+                if (!string.IsNullOrWhiteSpace(tag))
+                {
+                    parts.Add(tag);
+                }
+            }
+
+            return parts.Count > 0 ? string.Join(". ", parts) : Type.ToString();
+        }
+
+        public virtual bool HasEmbedding => !string.IsNullOrWhiteSpace(EmbeddingJson);
+
+        public virtual bool HasImageEmbedding => !string.IsNullOrWhiteSpace(ImageEmbeddingJson);
+
+        public virtual Report SetEmbedding(float[] embedding)
+        {
+            EmbeddingJson = JsonSerializer.Serialize(embedding);
+            return this;
+        }
+
+        public virtual float[]? GetEmbeddingVector()
+        {
+            return string.IsNullOrWhiteSpace(EmbeddingJson) ? null : JsonSerializer.Deserialize<float[]>(EmbeddingJson);
+        }
+
+        public virtual Report SetImageEmbedding(float[] embedding)
+        {
+            ImageEmbeddingJson = JsonSerializer.Serialize(embedding);
+            return this;
+        }
+
+        public virtual float[]? GetImageEmbeddingVector()
+        {
+            return string.IsNullOrWhiteSpace(ImageEmbeddingJson) ? null : JsonSerializer.Deserialize<float[]>(ImageEmbeddingJson);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Categories\CategoryConfiguration.cs" -Value @'
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore.Modeling;
+using LostFound.Categories;
+
+namespace LostFound.EntityFrameworkCore
+{
+    public static class CategoryConfiguration
+    {
+        public static void ConfigureCategory(this ModelBuilder builder)
+        {
+            builder.Entity<Category>(b =>
+            {
+                b.ToTable(LostFoundDbProperties.DbTablePrefix + "Categories", LostFoundDbProperties.DbSchema);
+                b.ConfigureByConvention();
+                b.Property(x => x.Name).IsRequired().HasMaxLength(CategoryConsts.MaxNameLength);
+                b.Property(x => x.Icon).HasMaxLength(CategoryConsts.MaxIconLength);
+                b.HasIndex(x => x.Name);
+            });
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Categories\EfCoreCategoryRepository.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore;
+using LostFound.EntityFrameworkCore;
+
+namespace LostFound.Categories
+{
+    public class EfCoreCategoryRepository :
+        EfCoreRepository<LostFoundDbContext, Category, Guid>,
+        ICategoryRepository
+    {
+        public EfCoreCategoryRepository(IDbContextProvider<LostFoundDbContext> dbContextProvider)
+            : base(dbContextProvider)
+        {
+        }
+
+        public async Task<Category?> FindByNameAsync(string name)
+        {
+            var dbSet = await GetDbSetAsync();
+            return await dbSet.FirstOrDefaultAsync(c => c.Name.ToLower() == name.ToLower());
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\ILostFoundDbContext.cs" -Value @'
+using System;
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.Data;
+using Volo.Abp.EntityFrameworkCore;
+using LostFound.Categories;
+using LostFound.Locations;
+using LostFound.Reporters;
+using LostFound.Reports;
+using LostFound.Notifications;
+using LostFound.Matches;
+using LostFound.Products;
+
+namespace LostFound.EntityFrameworkCore
+{
+    [ConnectionStringName("Default")]
+    public interface ILostFoundDbContext : IEfCoreDbContext
+    {
+        DbSet<Category> Categories { get; }
+        DbSet<Location> Locations { get; }
+        DbSet<Reporter> Reporters { get; }
+        DbSet<Report> Reports { get; }
+        DbSet<Notification> Notifications { get; }
+        DbSet<Match> Matches { get; }
+        DbSet<Product> Products { get; }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Locations\EfCoreLocationRepository.cs" -Value @'
+using System;
+using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore;
+using LostFound.EntityFrameworkCore;
+
+namespace LostFound.Locations
+{
+    public class EfCoreLocationRepository :
+        EfCoreRepository<LostFoundDbContext, Location, Guid>,
+        ILocationRepository
+    {
+        public EfCoreLocationRepository(IDbContextProvider<LostFoundDbContext> dbContextProvider)
+            : base(dbContextProvider)
+        {
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Locations\LocationConfiguration.cs" -Value @'
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore.Modeling;
+using LostFound.Locations;
+
+namespace LostFound.EntityFrameworkCore
+{
+    public static class LocationConfiguration
+    {
+        public static void ConfigureLocation(this ModelBuilder builder)
+        {
+            builder.Entity<Location>(b =>
+            {
+                b.ToTable(LostFoundDbProperties.DbTablePrefix + "Locations", LostFoundDbProperties.DbSchema);
+                b.ConfigureByConvention();
+                b.Property(x => x.PlaceName).IsRequired().HasMaxLength(LocationConsts.MaxPlaceNameLength);
+            });
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\LostFoundDbContext.cs" -Value @'
+using System;
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.Data;
+using Volo.Abp.EntityFrameworkCore;
+using LostFound.Categories;
+using LostFound.Locations;
+using LostFound.Reporters;
+using LostFound.Reports;
+using LostFound.Notifications;
+using LostFound.Matches;
+using LostFound.Products;
+
+namespace LostFound.EntityFrameworkCore
+{
+    [ConnectionStringName("Default")]
+    public class LostFoundDbContext : AbpDbContext<LostFoundDbContext>, ILostFoundDbContext
+    {
+        public DbSet<Category> Categories { get; set; } = null!;
+        public DbSet<Location> Locations { get; set; } = null!;
+        public DbSet<Reporter> Reporters { get; set; } = null!;
+        public DbSet<Report> Reports { get; set; } = null!;
+        public DbSet<Notification> Notifications { get; set; } = null!;
+        public DbSet<Match> Matches { get; set; } = null!;
+        public DbSet<Product> Products { get; set; } = null!;
+
+        public LostFoundDbContext(DbContextOptions<LostFoundDbContext> options) : base(options)
+        {
+        }
+
+        protected override void OnModelCreating(ModelBuilder builder)
+        {
+            base.OnModelCreating(builder);
+
+            // Standalone use of this module's own DbContext (e.g. running
+            // its own migrations) needs this call too, in addition to the
+            // Host calling builder.ConfigureLostFound() from its own
+            // DbContext.
+            builder.ConfigureLostFound();
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\LostFoundDbContextModelCreatingExtensions.cs" -Value @'
+using Microsoft.EntityFrameworkCore;
+using LostFound.Categories;
+using LostFound.Locations;
+using LostFound.Reporters;
+using LostFound.Reports;
+using LostFound.Notifications;
+using LostFound.Matches;
+using LostFound.Products;
+
+namespace LostFound.EntityFrameworkCore
+{
+    public static class LostFoundDbContextModelCreatingExtensions
+    {
+        public static void ConfigureLostFound(this ModelBuilder builder)
+        {
+            // Order matters: entities with FKs must be configured after the
+            // entities they reference.
+            builder.ConfigureCategory();
+            builder.ConfigureLocation();
+            builder.ConfigureReporter();
+            builder.ConfigureReport();
+            builder.ConfigureNotification();
+            builder.ConfigureMatch();
+            builder.ConfigureProduct();
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Matches\EfCoreMatchRepository.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore;
+using LostFound.EntityFrameworkCore;
+
+namespace LostFound.Matches
+{
+    public class EfCoreMatchRepository :
+        EfCoreRepository<LostFoundDbContext, Match, Guid>,
+        IMatchRepository
+    {
+        public EfCoreMatchRepository(IDbContextProvider<LostFoundDbContext> dbContextProvider)
+            : base(dbContextProvider)
+        {
+        }
+
+        public async Task<bool> ExistsForPairAsync(Guid lostReportId, Guid foundReportId)
+        {
+            var dbSet = await GetDbSetAsync();
+            return await dbSet.AnyAsync(m => m.LostReportId == lostReportId && m.FoundReportId == foundReportId);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Matches\MatchConfiguration.cs" -Value @'
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore.Modeling;
+using LostFound.Matches;
+using LostFound.Reports;
+
+namespace LostFound.EntityFrameworkCore
+{
+    public static class MatchConfiguration
+    {
+        public static void ConfigureMatch(this ModelBuilder builder)
+        {
+            builder.Entity<Match>(b =>
+            {
+                b.ToTable(LostFoundDbProperties.DbTablePrefix + "Matches", LostFoundDbProperties.DbSchema);
+                b.ConfigureByConvention();
+
+                b.Property(x => x.SimilarityScore).HasColumnType("decimal(5,2)");
+                b.Property(x => x.MatchReason).HasColumnType("nvarchar(max)");
+                b.Property(x => x.Status).HasConversion<string>().HasMaxLength(MatchConsts.MaxStatusLength).IsRequired();
+
+                b.HasOne<Report>().WithMany().HasForeignKey(x => x.LostReportId).OnDelete(DeleteBehavior.Restrict).IsRequired();
+                b.HasOne<Report>().WithMany().HasForeignKey(x => x.FoundReportId).OnDelete(DeleteBehavior.Restrict).IsRequired();
+
+                b.HasIndex(x => x.Status);
+                b.HasIndex(x => new { x.LostReportId, x.FoundReportId }).IsUnique();
+            });
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Notifications\EfCoreNotificationRepository.cs" -Value @'
+using System;
+using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore;
+using LostFound.EntityFrameworkCore;
+
+namespace LostFound.Notifications
+{
+    public class EfCoreNotificationRepository :
+        EfCoreRepository<LostFoundDbContext, Notification, Guid>,
+        INotificationRepository
+    {
+        public EfCoreNotificationRepository(IDbContextProvider<LostFoundDbContext> dbContextProvider)
+            : base(dbContextProvider)
+        {
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Notifications\NotificationConfiguration.cs" -Value @'
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore.Modeling;
+using LostFound.Notifications;
+using LostFound.Reporters;
+using LostFound.Reports;
+
+namespace LostFound.EntityFrameworkCore
+{
+    public static class NotificationConfiguration
+    {
+        public static void ConfigureNotification(this ModelBuilder builder)
+        {
+            builder.Entity<Notification>(b =>
+            {
+                b.ToTable(LostFoundDbProperties.DbTablePrefix + "Notifications", LostFoundDbProperties.DbSchema);
+                b.ConfigureByConvention();
+                b.Property(x => x.Title).HasMaxLength(NotificationConsts.MaxTitleLength);
+
+                b.HasOne<Reporter>().WithMany().HasForeignKey(x => x.ReporterId).OnDelete(DeleteBehavior.Restrict).IsRequired();
+                b.HasOne<Report>().WithMany().HasForeignKey(x => x.ReportId).OnDelete(DeleteBehavior.Restrict).IsRequired();
+
+                b.HasIndex(x => x.ReporterId);
+            });
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Products\EfCoreProductRepository.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore;
+using LostFound.EntityFrameworkCore;
+
+namespace LostFound.Products
+{
+    public class EfCoreProductRepository :
+        EfCoreRepository<LostFoundDbContext, Product, Guid>,
+        IProductRepository
+    {
+        public EfCoreProductRepository(IDbContextProvider<LostFoundDbContext> dbContextProvider)
+            : base(dbContextProvider)
+        {
+        }
+
+        public async Task<Product?> FindByNameAsync(string name)
+        {
+            var dbSet = await GetDbSetAsync();
+            return await dbSet.FirstOrDefaultAsync(p => p.Name == name);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Products\ProductConfiguration.cs" -Value @'
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore.Modeling;
+using LostFound.Products;
+
+namespace LostFound.EntityFrameworkCore
+{
+    public static class ProductConfiguration
+    {
+        public static void ConfigureProduct(this ModelBuilder builder)
+        {
+            builder.Entity<Product>(b =>
+            {
+                b.ToTable(LostFoundDbProperties.DbTablePrefix + "Products", LostFoundDbProperties.DbSchema);
+                b.ConfigureByConvention();
+
+                b.Property(x => x.Name)
+                    .IsRequired()
+                    .HasMaxLength(ProductConsts.MaxNameLength);
+
+                b.Property(x => x.Description)
+                    .HasMaxLength(ProductConsts.MaxDescriptionLength);
+
+                b.Property(x => x.Price)
+                    .HasColumnType("decimal(18,2)");
+
+                b.HasIndex(x => x.Name);
+            });
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Reporters\EfCoreReporterRepository.cs" -Value @'
+using System;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore;
+using LostFound.EntityFrameworkCore;
+
+namespace LostFound.Reporters
+{
+    public class EfCoreReporterRepository :
+        EfCoreRepository<LostFoundDbContext, Reporter, Guid>,
+        IReporterRepository
+    {
+        public EfCoreReporterRepository(IDbContextProvider<LostFoundDbContext> dbContextProvider)
+            : base(dbContextProvider)
+        {
+        }
+
+        public async Task<Reporter?> FindByIdentityUserIdAsync(Guid identityUserId)
+        {
+            var dbSet = await GetDbSetAsync();
+            return await dbSet.FirstOrDefaultAsync(r => r.IdentityUserId == identityUserId);
+        }
+
+        public async Task<Reporter?> FindByPhoneAsync(string phone)
+        {
+            var dbSet = await GetDbSetAsync();
+            return await dbSet.FirstOrDefaultAsync(r => r.Phone == phone);
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Reporters\ReporterConfiguration.cs" -Value @'
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore.Modeling;
+using LostFound.Reporters;
+
+namespace LostFound.EntityFrameworkCore
+{
+    public static class ReporterConfiguration
+    {
+        public static void ConfigureReporter(this ModelBuilder builder)
+        {
+            builder.Entity<Reporter>(b =>
+            {
+                b.ToTable(LostFoundDbProperties.DbTablePrefix + "Reporters", LostFoundDbProperties.DbSchema);
+                b.ConfigureByConvention();
+
+                b.Property(x => x.Name)
+                    .HasMaxLength(ReporterConsts.MaxNameLength);
+
+                b.Property(x => x.Phone)
+                    .IsRequired()
+                    .HasMaxLength(ReporterConsts.MaxPhoneLength);
+
+                b.Property(x => x.Email)
+                    .HasMaxLength(ReporterConsts.MaxEmailLength);
+
+                // IdentityUserId is a PLAIN column, no FK/navigation -
+                // IdentityUser lives in the Host module; modules should not
+                // take hard EF dependencies on each other's tables.
+                b.Property(x => x.IdentityUserId);
+
+                b.HasIndex(x => x.IdentityUserId);
+                b.HasIndex(x => x.Phone);
+            });
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Reports\EfCoreReportRepository.cs" -Value @'
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore;
+using LostFound.EntityFrameworkCore;
+
+namespace LostFound.Reports
+{
+    public class EfCoreReportRepository :
+        EfCoreRepository<LostFoundDbContext, Report, Guid>,
+        IReportRepository
+    {
+        public EfCoreReportRepository(IDbContextProvider<LostFoundDbContext> dbContextProvider)
+            : base(dbContextProvider)
+        {
+        }
+
+        public async Task<List<Report>> GetListByCategoryAsync(Guid categoryId)
+        {
+            var dbSet = await GetDbSetAsync();
+            return await dbSet.Where(r => r.CategoryId == categoryId).ToListAsync();
+        }
+
+        public async Task<List<Report>> GetMatchCandidatesAsync(Guid reportId, ReportType oppositeType)
+        {
+            var dbSet = await GetDbSetAsync();
+
+            return await dbSet
+                .Where(r => r.Id != reportId)
+                .Where(r => r.Type == oppositeType)
+                .Where(r => r.Status == ReportStatus.Open)
+                .Where(r => r.EmbeddingJson != null)
+                .ToListAsync();
+        }
+
+        public async Task<List<Report>> GetSearchableReportsAsync(ReportType? type)
+        {
+            var dbSet = await GetDbSetAsync();
+
+            var queryable = dbSet.Where(r => r.EmbeddingJson != null);
+
+            if (type.HasValue)
+            {
+                queryable = queryable.Where(r => r.Type == type.Value);
+            }
+
+            return await queryable.ToListAsync();
+        }
+    }
+}
+'@
+
+Set-Content -Path ".\LostFound.EntityFrameworkCore\EntityFrameworkCore\Reports\ReportConfiguration.cs" -Value @'
+using Microsoft.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore.Modeling;
+using LostFound.Reports;
+using LostFound.Reporters;
+using LostFound.Categories;
+using LostFound.Locations;
+
+namespace LostFound.EntityFrameworkCore
+{
+    public static class ReportConfiguration
+    {
+        public static void ConfigureReport(this ModelBuilder builder)
+        {
+            builder.Entity<Report>(b =>
+            {
+                b.ToTable(LostFoundDbProperties.DbTablePrefix + "Reports", LostFoundDbProperties.DbSchema);
+                b.ConfigureByConvention();
+
+                b.Property(x => x.Type).HasConversion<string>().HasMaxLength(32).IsRequired();
+                b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+
+                b.Property(x => x.Color).HasMaxLength(ReportConsts.MaxColorLength);
+                b.Property(x => x.ImagePath).HasMaxLength(ReportConsts.MaxImagePathLength);
+                b.Property(x => x.PickupLocation).HasMaxLength(ReportConsts.MaxPickupLocationLength);
+                b.Property(x => x.LocationDetails).HasMaxLength(ReportConsts.MaxLocationDetailsLength);
+
+                b.Property(x => x.AiObjectType).HasMaxLength(128);
+                b.Property(x => x.AiBrand).HasMaxLength(128);
+                b.Property(x => x.AiTagsJson).HasColumnType("nvarchar(max)");
+
+                b.Property(x => x.EmbeddingJson).HasColumnType("nvarchar(max)");
+                b.Property(x => x.ImageEmbeddingJson).HasColumnType("nvarchar(max)");
+
+                b.HasOne<Reporter>().WithMany().HasForeignKey(x => x.ReporterId).OnDelete(DeleteBehavior.Restrict).IsRequired();
+
+                // CategoryId is OPTIONAL - AI fills it in later.
+                b.HasOne<Category>().WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.SetNull);
+
+                // LocationId stays required - still the FK used for
+                // analytics/filtering.
+                b.HasOne<Location>().WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict).IsRequired();
+
+                b.HasIndex(x => x.Status);
+                b.HasIndex(x => x.Type);
+                b.HasIndex(x => x.CategoryId);
+                b.HasIndex(x => x.LocationId);
+            });
+        }
+    }
+}
+'@
+
+Write-Host ""
+Write-Host "===============================================================" -ForegroundColor Green
+Write-Host " LostFound module generated successfully (ABP 10.4.1)." -ForegroundColor Green
+Write-Host " AI (embeddings + classification) is MERGED into LostFound.Application" -ForegroundColor Green
+Write-Host " - there is no separate LostFound.AI project/module." -ForegroundColor Green
+Write-Host "===============================================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "=== Remaining manual steps ===" -ForegroundColor Yellow
+Write-Host "1. Add PackageReferences to LostFound.Application.csproj: Riok.Mapperly, Volo.Abp.Mapperly, MiniExcelLibs, Microsoft.Extensions.Http, Volo.Abp.BlobStoring" -ForegroundColor Cyan
+Write-Host "2. In LostFoundApplicationModule.cs: add AbpMapperlyModule + AbpBackgroundJobsModule to [DependsOn(...)], and call context.Services.AddLostFoundAiProviders(context.Services.GetConfiguration()); inside ConfigureServices" -ForegroundColor Cyan
+Write-Host "3. If the Host has its own DbContext, call builder.ConfigureLostFound() from its OnModelCreating" -ForegroundColor Cyan
+Write-Host "4. appsettings.json: LostFound:AI:Provider=Gemini (or Ollama/HuggingFace/OpenAI), LostFound:AI:MatchThreshold=75, plus the relevant ApiKey" -ForegroundColor Cyan
+Write-Host "5. Ensure AbpBackgroundJobOptions.IsJobExecutionEnabled = true on the Host" -ForegroundColor Cyan
+Write-Host "6. Configure a BlobStoring container for IBlobContainer<ReportImageContainer>" -ForegroundColor Cyan
+Write-Host "7. Frontend: no Category dropdown in the Lost/Found form - only LocationId + optional LocationDetails" -ForegroundColor Cyan
+Write-Host "8. dotnet ef migrations add Init_LostFound_With_AI; dotnet ef database update" -ForegroundColor Cyan
+Write-Host "9. dotnet clean; dotnet build (full solution)" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Ready to go!" -ForegroundColor Green

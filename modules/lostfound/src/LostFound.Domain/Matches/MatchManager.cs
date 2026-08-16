@@ -1,0 +1,202 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Volo.Abp;
+using Volo.Abp.Domain.Services;
+using LostFound.Reports;
+using LostFound.Matching;
+using LostFound.Notifications;
+
+namespace LostFound.Matches
+{
+    public class MatchManager : DomainService
+    {
+        private readonly IMatchRepository _matchRepository;
+        private readonly IReportRepository _reportRepository;
+        private readonly INotificationRepository _notificationRepository;
+        private readonly IMatchRankingService _matchRankingService;
+        private readonly ILogger<MatchManager> _logger;
+
+        public MatchManager(
+            IMatchRepository matchRepository,
+            IReportRepository reportRepository,
+            INotificationRepository notificationRepository,
+            IMatchRankingService matchRankingService,
+            ILogger<MatchManager> logger)
+        {
+            _matchRepository = matchRepository;
+            _reportRepository = reportRepository;
+            _notificationRepository = notificationRepository;
+            _matchRankingService = matchRankingService;
+            _logger = logger;
+        }
+
+        // Called by the background job AFTER the report's embedding has
+        // already been generated and saved.
+        //
+        // Architectural note (Arabic-E2E-Matching-Accuracy-Validation
+        // follow-up): text scoring now flows through IMatchRankingService,
+        // the SAME ranking pipeline (query understanding -> hybrid
+        // retrieval -> feature scoring -> object-type/category/brand/color
+        // metadata penalties -> confidence calibration) that
+        // AiSearchAppService uses for real user searches - see
+        // IMatchRankingService's own remarks for why this seam exists and
+        // what it replaced (a separate, ad-hoc raw-cosine-similarity
+        // calculation that could - and, with real evidence, did - reach a
+        // different conclusion than Search for the exact same pair). This
+        // is the single source of truth for text-relevance now; it is not
+        // duplicated here.
+        //
+        // Category plays no role in CANDIDATE SELECTION (still just
+        // "opposite type, Open, has an embedding" - see
+        // IReportRepository.GetMatchCandidatesAsync) - only in scoring,
+        // exactly as Search already treats it.
+        //
+        // Image similarity is blended in (60/40 with the unified text
+        // score) when BOTH reports have an image embedding - this remains
+        // a MatchManager-specific addition on top of the unified score,
+        // not a duplicate of anything Search does, because
+        // ISemanticSearchOrchestrator is text-only by design (see its own
+        // remarks) and unifying image ranking too would be a materially
+        // larger change than this fix's scope.
+        public async Task<int> FindAndCreateMatchesAsync(
+            Guid reportId,
+            double thresholdPercentage,
+            string providerNameForExplanation)
+        {
+            var report = await _reportRepository.GetAsync(reportId);
+
+            var textEmbedding = report.GetEmbeddingVector();
+            if (textEmbedding == null)
+            {
+                return 0;
+            }
+
+            var oppositeType = report.Type == ReportType.Lost ? ReportType.Found : ReportType.Lost;
+
+            var candidates = await _reportRepository.GetMatchCandidatesAsync(report.Id, oppositeType);
+
+            // Resilience fallback, not the normal path: if the shared
+            // ranking pipeline itself is unavailable this run (a transient
+            // embedding/LLM/DB hiccup somewhere inside query understanding
+            // or retrieval), matching degrades to the old raw-embedding
+            // comparison rather than silently producing zero matches for
+            // every candidate - logged clearly so this is never a silent
+            // degradation.
+            IReadOnlyDictionary<Guid, double>? unifiedScores = null;
+            try
+            {
+                unifiedScores = await _matchRankingService.RankCandidatesAsync(report);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "MatchManager: unified ranking pipeline failed for ReportId={ReportId}; falling back to raw embedding " +
+                    "similarity for this run only.",
+                    reportId);
+            }
+
+            var createdCount = 0;
+
+            foreach (var candidate in candidates)
+            {
+                double score;
+
+                if (unifiedScores != null)
+                {
+                    if (!unifiedScores.TryGetValue(candidate.Id, out score))
+                    {
+                        // The shared ranking pipeline considered this
+                        // candidate (it is text-searchable, opposite type)
+                        // and found no meaningful signal for it at all -
+                        // exactly what a real search for `report`'s own
+                        // text would show: this candidate simply would not
+                        // appear. This IS the fix - Search and Matching now
+                        // reach the same decision for the same pair, so a
+                        // report the ranking pipeline would never surface
+                        // is not scored via a different algorithm here.
+                        continue;
+                    }
+                }
+                else
+                {
+                    score = CosineSimilarityCalculator.CalculatePercentage(textEmbedding, candidate.GetEmbeddingVector());
+                }
+
+                var imageEmbedding = report.GetImageEmbeddingVector();
+                var candidateImageEmbedding = candidate.GetImageEmbeddingVector();
+
+                if (imageEmbedding != null && candidateImageEmbedding != null)
+                {
+                    var imageScore = CosineSimilarityCalculator.CalculatePercentage(imageEmbedding, candidateImageEmbedding);
+                    score = (score * 0.6) + (imageScore * 0.4);
+                }
+
+                if (score < thresholdPercentage)
+                {
+                    continue;
+                }
+
+                var lostReportId = report.Type == ReportType.Lost ? report.Id : candidate.Id;
+                var foundReportId = report.Type == ReportType.Found ? report.Id : candidate.Id;
+
+                if (await _matchRepository.ExistsForPairAsync(lostReportId, foundReportId))
+                {
+                    continue;
+                }
+
+                var explanation = MatchExplanationBuilder.Build(score, providerNameForExplanation);
+
+                var match = new Match(
+                    GuidGenerator.Create(),
+                    lostReportId,
+                    foundReportId,
+                    (decimal)score,
+                    explanation,
+                    MatchStatus.Pending,
+                    isAutoGenerated: true
+                );
+
+                await _matchRepository.InsertAsync(match);
+
+                await NotifyBothReportersAsync(
+                    match,
+                    lostReportId == report.Id ? report : candidate,
+                    foundReportId == report.Id ? report : candidate,
+                    "Possible match found",
+                    $"We found a possible match with {score:0.0}% confidence. Please review it."
+                );
+
+                createdCount++;
+            }
+
+            return createdCount;
+        }
+
+        public async Task NotifyMatchDecisionAsync(Match match, bool accepted)
+        {
+            var lostReport = await _reportRepository.GetAsync(match.LostReportId);
+            var foundReport = await _reportRepository.GetAsync(match.FoundReportId);
+
+            var title = accepted ? "Match accepted" : "Match rejected";
+            var message = accepted
+                ? "Your match was confirmed by the other party."
+                : "Your match was rejected by the other party.";
+
+            await NotifyBothReportersAsync(match, lostReport, foundReport, title, message);
+        }
+
+        private async Task NotifyBothReportersAsync(Match match, Report lostReport, Report foundReport, string title, string message)
+        {
+            await _notificationRepository.InsertAsync(
+                new Notification(GuidGenerator.Create(), lostReport.ReporterId, lostReport.Id, title, message)
+            );
+
+            await _notificationRepository.InsertAsync(
+                new Notification(GuidGenerator.Create(), foundReport.ReporterId, foundReport.Id, title, message)
+            );
+        }
+    }
+}

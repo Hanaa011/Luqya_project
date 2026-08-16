@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\common.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>LostFound</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.7" />
+    <ProjectReference Include="..\..\src\LostFound.EntityFrameworkCore\LostFound.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\LostFound.Application.Tests\LostFound.Application.Tests.csproj" />
+    <PackageReference Include="Volo.Abp.EntityFrameworkCore.Sqlite" Version="10.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="EntityFrameworkCore\Applications\" />
+    <Folder Include="EntityFrameworkCore\Domains\" />
+  </ItemGroup>
+
+</Project>

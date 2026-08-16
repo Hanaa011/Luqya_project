@@ -1,0 +1,33 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "baseUrl": "./",
+    "outDir": "./dist/out-tsc",
+    "sourceMap": true,
+    "declaration": false,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "moduleResolution": "bundler",
+    "importHelpers": true,
+    "skipLibCheck": true,
+    "target": "ES2022",
+    "module": "ES2022",
+    "lib": [
+      "ES2022",
+      "dom",
+      "esnext.disposable"
+    ],
+    "paths": {
+      "@lost-found": [
+        "../modules/lostfound/angular/projects/lost-found/src/public-api.ts"
+      ],
+      "@lost-found/config": [
+        "../modules/lostfound/angular/projects/lost-found/config/src/public-api.ts"
+      ]
+    },
+    "useDefineForClassFields": false
+  },
+  "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false
+  }
+}

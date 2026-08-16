@@ -1,0 +1,37 @@
+{
+  "datasetName": "lostfound-lexicon-personal-items",
+  "datasetVersion": "1.1.0",
+  "concepts": [
+    {
+      "key": "pen",
+      "category": "Accessories",
+      "parentKey": null,
+      "names": { "en": "Pen", "ar": "قلم", "ur": "قلم" },
+      "synonyms": { "en": ["ink pen", "ballpoint pen"] },
+      "aliases": { "ar": ["قلم حبر"] }
+    },
+    {
+      "key": "ring",
+      "category": "Accessories",
+      "parentKey": "jewelry",
+      "names": { "en": "Ring", "ar": "خاتم", "ur": "انگوٹھی" },
+      "synonyms": { "en": ["finger ring"] }
+    },
+    {
+      "key": "bank-card",
+      "category": "Documents",
+      "parentKey": null,
+      "names": { "en": "Bank Card", "ar": "بطاقة بنكية", "ur": "بینک کارڈ" },
+      "synonyms": { "en": ["credit card", "debit card", "payment card"] },
+      "aliases": { "ar": ["بطاقة ائتمان", "بطاقة صراف", "كرت بنك"] }
+    },
+
+    { "key": "brand-visa", "category": "Brand", "parentKey": null,
+      "names": { "en": "Visa", "ar": "فيزا", "ur": "ویزا" } },
+    { "key": "brand-mastercard", "category": "Brand", "parentKey": null,
+      "names": { "en": "Mastercard", "ar": "ماستركارد", "ur": "ماسٹر کارڈ" },
+      "aliases": { "ar": ["ماستر كارد"] } },
+    { "key": "brand-mada", "category": "Brand", "parentKey": null,
+      "names": { "en": "Mada", "ar": "مدى", "ur": "مدہ" } }
+  ]
+}

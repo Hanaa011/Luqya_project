@@ -1,0 +1,116 @@
+{
+  "datasetName": "lostfound-lexicon-electronics-brands",
+  "datasetVersion": "1.1.0",
+  "concepts": [
+    {
+      "key": "tv-remote",
+      "category": "Electronics",
+      "parentKey": null,
+      "names": { "en": "Remote", "ar": "ريموت تلفزيون", "ur": "ٹی وی ریموٹ" },
+      "synonyms": { "en": ["remote control", "TV remote"] },
+      "aliases": { "ar": ["ريموت التلفزيون", "ريموت تلفاز", "ريموت تيلفيزيون"] }
+    },
+    {
+      "key": "computer-mouse",
+      "category": "Electronics",
+      "parentKey": null,
+      "names": { "en": "Mouse", "ar": "ماوس", "ur": "ماؤس" },
+      "synonyms": { "en": ["computer mouse", "wireless mouse"] },
+      "aliases": { "ar": ["فأرة الكمبيوتر"] }
+    },
+    {
+      "key": "camera",
+      "category": "Electronics",
+      "parentKey": null,
+      "names": { "en": "Camera", "ar": "كاميرا", "ur": "کیمرہ" },
+      "synonyms": { "en": ["digital camera"] },
+      "aliases": {
+        "en": ["cam", "EOS", "EOS R50", "PowerShot"],
+        "ar": ["كاميره"]
+      },
+      "dialectWords": { "ar": ["كميرا"] },
+      "commonMisspellings": { "en": ["camara", "camra"] }
+    },
+    {
+      "key": "dslr-camera",
+      "category": "Electronics",
+      "parentKey": "camera",
+      "names": { "en": "DSLR Camera", "ar": "كاميرا رقمية احترافية", "ur": "ڈی ایس ایل آر کیمرہ" },
+      "aliases": { "en": ["DSLR", "digital SLR"] }
+    },
+    {
+      "key": "mirrorless-camera",
+      "category": "Electronics",
+      "parentKey": "camera",
+      "names": { "en": "Mirrorless Camera", "ar": "كاميرا بدون مرآة", "ur": "مررلیس کیمرہ" },
+      "aliases": { "en": ["mirrorless"] }
+    },
+    {
+      "key": "action-camera",
+      "category": "Electronics",
+      "parentKey": "camera",
+      "names": { "en": "Action Camera", "ar": "كاميرا أكشن", "ur": "ایکشن کیمرہ" }
+    },
+    {
+      "key": "camera-lens",
+      "category": "Electronics",
+      "parentKey": null,
+      "names": { "en": "Camera Lens", "ar": "عدسة كاميرا", "ur": "کیمرہ لینس" },
+      "aliases": { "en": ["lens"], "ar": ["عدسة"] }
+    },
+    {
+      "key": "tripod",
+      "category": "Electronics",
+      "parentKey": null,
+      "names": { "en": "Tripod", "ar": "حامل ثلاثي القوائم", "ur": "تپائی" },
+      "aliases": { "ar": ["ترايبود", "حامل كاميرا"] }
+    },
+    {
+      "key": "memory-card",
+      "category": "Electronics",
+      "parentKey": null,
+      "names": { "en": "Memory Card", "ar": "بطاقة ذاكرة", "ur": "میموری کارڈ" },
+      "aliases": { "en": ["SD card", "microSD", "memory chip"] }
+    },
+    {
+      "key": "usb-drive",
+      "category": "Electronics",
+      "parentKey": null,
+      "names": { "en": "USB Drive", "ar": "فلاش ميموري", "ur": "یو ایس بی ڈرائیو" },
+      "synonyms": { "en": ["flash drive", "thumb drive"] },
+      "aliases": { "ar": ["فلاشة", "يو اس بي"] }
+    },
+    {
+      "key": "passport-cover",
+      "category": "Documents",
+      "parentKey": null,
+      "names": { "en": "Passport Cover", "ar": "غلاف جواز السفر", "ur": "پاسپورٹ کور" },
+      "aliases": { "en": ["passport holder", "passport case"] }
+    },
+    {
+      "key": "car-key",
+      "category": "Accessories",
+      "parentKey": "keys",
+      "names": { "en": "Car Key", "ar": "مفتاح سيارة", "ur": "گاڑی کی چابی" }
+    },
+    {
+      "key": "remote-key",
+      "category": "Accessories",
+      "parentKey": "keys",
+      "names": { "en": "Remote Key", "ar": "ريموت المفتاح", "ur": "ریموٹ کی" },
+      "synonyms": { "en": ["key fob"] }
+    },
+
+    { "key": "brand-canon", "category": "Brand", "parentKey": null,
+      "names": { "en": "Canon", "ar": "كانون", "ur": "کینن" },
+      "aliases": { "en": ["Canon Inc", "Canon Inc."], "ar": ["كانن"] } },
+    { "key": "brand-nikon", "category": "Brand", "parentKey": null,
+      "names": { "en": "Nikon", "ar": "نيكون", "ur": "نکون" },
+      "aliases": { "ar": ["نايكون"] } },
+    { "key": "brand-gopro", "category": "Brand", "parentKey": null,
+      "names": { "en": "GoPro", "ar": "جو برو", "ur": "گو پرو" } },
+    { "key": "brand-fujifilm", "category": "Brand", "parentKey": null,
+      "names": { "en": "Fujifilm", "ar": "فوجي فيلم", "ur": "فوجی فلم" },
+      "aliases": { "en": ["Fuji"] } }
+  ]
+}

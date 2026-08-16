@@ -1,0 +1,118 @@
+{
+  "template": "app",
+  "imports": {
+    "Volo.Abp.LeptonXLiteTheme": {
+      "version": "5.4.1",
+      "isInstalled": true,
+      "creationTime": "07/13/2026 22:42:42 +00:00"
+    },
+    "Volo.Abp.Account": {
+      "version": "10.4.1",
+      "isInstalled": true,
+      "creationTime": "07/13/2026 22:42:42 +00:00"
+    },
+    "Volo.Abp.OpenIddict": {
+      "version": "10.4.1",
+      "isInstalled": true,
+      "creationTime": "07/13/2026 22:42:42 +00:00"
+    },
+    "Volo.Abp.Identity": {
+      "version": "10.4.1",
+      "isInstalled": true,
+      "creationTime": "07/13/2026 22:42:42 +00:00"
+    },
+    "Volo.Abp.TenantManagement": {
+      "version": "10.4.1",
+      "isInstalled": true,
+      "creationTime": "07/13/2026 22:42:42 +00:00"
+    },
+    "Volo.Abp.SettingManagement": {
+      "version": "10.4.1",
+      "isInstalled": true,
+      "creationTime": "07/13/2026 22:42:42 +00:00"
+    },
+    "Volo.Abp.PermissionManagement": {
+      "version": "10.4.1",
+      "isInstalled": true,
+      "creationTime": "07/13/2026 22:42:42 +00:00"
+    },
+    "Volo.Abp.FeatureManagement": {
+      "version": "10.4.1",
+      "isInstalled": true,
+      "creationTime": "07/13/2026 22:42:42 +00:00"
+    },
+    "Volo.Abp.BlobStoring.Database": {
+      "version": "10.4.1",
+      "isInstalled": true,
+      "creationTime": "07/13/2026 22:42:42 +00:00"
+    },
+    "LostFound": {
+      "path": "modules/lostfound/LostFound.abpmdl",
+      "isInstalled": true
+    }
+  },
+  "folders": {
+    "items": {
+      "src": {},
+      "test": {}
+    }
+  },
+  "packages": {
+    "Forge.Application": {
+      "path": "src/Forge.Application/Forge.Application.abppkg",
+      "folder": "src"
+    },
+    "Forge.Application.Tests": {
+      "path": "test/Forge.Application.Tests/Forge.Application.Tests.abppkg",
+      "folder": "test"
+    },
+    "Forge.Domain.Shared": {
+      "path": "src/Forge.Domain.Shared/Forge.Domain.Shared.abppkg",
+      "folder": "src"
+    },
+    "Forge.Application.Contracts": {
+      "path": "src/Forge.Application.Contracts/Forge.Application.Contracts.abppkg",
+      "folder": "src"
+    },
+    "Forge.HttpApi": {
+      "path": "src/Forge.HttpApi/Forge.HttpApi.abppkg",
+      "folder": "src"
+    },
+    "Forge.HttpApi.Client": {
+      "path": "src/Forge.HttpApi.Client/Forge.HttpApi.Client.abppkg",
+      "folder": "src"
+    },
+    "Forge.EntityFrameworkCore.Tests": {
+      "path": "test/Forge.EntityFrameworkCore.Tests/Forge.EntityFrameworkCore.Tests.abppkg",
+      "folder": "test"
+    },
+    "Forge.EntityFrameworkCore": {
+      "path": "src/Forge.EntityFrameworkCore/Forge.EntityFrameworkCore.abppkg",
+      "folder": "src"
+    },
+    "Forge.TestBase": {
+      "path": "test/Forge.TestBase/Forge.TestBase.abppkg",
+      "folder": "test"
+    },
+    "Forge.Domain.Tests": {
+      "path": "test/Forge.Domain.Tests/Forge.Domain.Tests.abppkg",
+      "folder": "test"
+    },
+    "Forge.HttpApi.Client.ConsoleTestApp": {
+      "path": "test/Forge.HttpApi.Client.ConsoleTestApp/Forge.HttpApi.Client.ConsoleTestApp.abppkg",
+      "folder": "test"
+    },
+    "Forge.DbMigrator": {
+      "path": "src/Forge.DbMigrator/Forge.DbMigrator.abppkg",
+      "folder": "src"
+    },
+    "Forge.HttpApi.Host": {
+      "path": "src/Forge.HttpApi.Host/Forge.HttpApi.Host.abppkg",
+      "folder": "src"
+    },
+    "Forge.Domain": {
+      "path": "src/Forge.Domain/Forge.Domain.abppkg",
+      "folder": "src"
+    }
+  }
+}
