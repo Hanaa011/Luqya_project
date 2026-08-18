@@ -84,6 +84,7 @@ jobs:
 
       # 13. تحويل Docker Image إلى ملف
       - name: Save Docker Image
+      - name: Save Docker Image
         run: |
           docker save luqya-api:latest -o luqya-api.tar
 
@@ -137,7 +138,6 @@ jobs:
               --name luqya-api \
               --restart unless-stopped \
               -p 8080:80 \
-              -e AuthServer__RequireHttpsMetadata=false \
               -v /opt/projects/Leap/openiddict.pfx:/app/openiddict.pfx:ro \
               luqya-api:latest
 
