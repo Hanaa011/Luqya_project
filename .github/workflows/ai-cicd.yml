@@ -3,7 +3,7 @@ name: AI CI/CD
 on:
   push:
     branches:
-      - ai
+      - ai-feature
 
 jobs:
   build-and-deploy:
