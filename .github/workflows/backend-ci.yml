@@ -21,49 +21,50 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # 3. تثبيت Yarn
-      - name: Setup Yarn
-        run: |
-          npm install --global yarn@1.22.22
-          yarn --version
+      # 3. تثبيت Node.js 24
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
 
-      # 4. تثبيت ABP CLI بنفس نسخة ABP المستخدمة في المشروع
+      # 4. تثبيت Yarn
+      - name: Setup Yarn
+        run: npm install -g yarn@1.22.22
+
+      # 5. تثبيت ABP CLI بنفس إصدار المشروع
       - name: Setup ABP CLI
         run: |
-          dotnet tool install --global Volo.Abp.Cli --version 10.4.1
-          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-          abp --version
+          dotnet tool install -g Volo.Abp.Cli --version 10.4.1
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      # 5. استعادة حزم .NET
+      # 6. Restore
       - name: Restore
-        run: |
-          dotnet restore src/Forge.HttpApi.Host/Forge.HttpApi.Host.csproj
+        run: dotnet restore src/Forge.HttpApi.Host/Forge.HttpApi.Host.csproj
 
-      # 6. تثبيت مكتبات ABP / JavaScript
+      # 7. تثبيت مكتبات ABP و JavaScript
       - name: Install ABP Client Libraries
-        run: |
-          abp install-libs
+        run: abp install-libs
 
-      # 7. التأكد أن مكتبات الواجهة دخلت المشروع
+      # 8. التأكد أن المكتبات نزلت
       - name: Verify Client Libraries
         run: |
-          test -d src/Forge.HttpApi.Host/wwwroot/libs
-          ls -la src/Forge.HttpApi.Host/wwwroot/libs
+          echo "Checking wwwroot/libs..."
+          ls -lah src/Forge.HttpApi.Host/wwwroot/libs
 
-      # 8. Build + Publish
+      # 9. Build + Publish
       - name: Publish Backend
         run: |
           dotnet publish src/Forge.HttpApi.Host/Forge.HttpApi.Host.csproj \
             -c Release \
             -o src/Forge.HttpApi.Host/bin/Release/net10.0/publish
 
-      # 9. التأكد أن libs دخلت داخل الـ publish
+      # 10. التأكد أن المكتبات دخلت داخل Publish
       - name: Verify Published Libraries
         run: |
-          test -d src/Forge.HttpApi.Host/bin/Release/net10.0/publish/wwwroot/libs
-          ls -la src/Forge.HttpApi.Host/bin/Release/net10.0/publish/wwwroot/libs
+          echo "Checking published wwwroot/libs..."
+          ls -lah src/Forge.HttpApi.Host/bin/Release/net10.0/publish/wwwroot/libs
 
-      # 10. بناء Docker Image
+      # 11. بناء Docker Image
       - name: Build Docker Image
         run: |
           docker build \
@@ -71,18 +72,20 @@ jobs:
             -f src/Forge.HttpApi.Host/Dockerfile \
             src/Forge.HttpApi.Host
 
-      # 11. التأكد من وجود libs داخل Docker Image
+      # 12. التأكد من Docker Image
       - name: Verify Docker Image
         run: |
-          docker run --rm --entrypoint sh luqya-api:latest \
-            -c "ls -ld /app/wwwroot/libs && ls -la /app/wwwroot/libs | head -20"
+          docker run --rm \
+            --entrypoint sh \
+            luqya-api:latest \
+            -c "ls -ld /app/wwwroot/libs"
 
-      # 12. تحويل Docker Image إلى ملف
+      # 13. تحويل Docker Image إلى ملف
       - name: Save Docker Image
         run: |
           docker save luqya-api:latest -o luqya-api.tar
 
-      # 13. رفع الـ Image للسيرفر
+      # 14. رفع الـ Image للسيرفر
       - name: Copy Image to Server
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -95,7 +98,7 @@ jobs:
           timeout: 120s
           command_timeout: 10m
 
-      # 14. تشغيل النسخة الجديدة
+      # 15. تشغيل النسخة الجديدة
       - name: Deploy on Server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -108,6 +111,14 @@ jobs:
             echo "Loading new Docker image..."
             docker load -i luqya-api.tar
 
+            echo "Saving current image as previous..."
+
+            if docker inspect luqya-api >/dev/null 2>&1; then
+              CURRENT_IMAGE=$(docker inspect luqya-api --format '{{.Image}}')
+              docker tag "$CURRENT_IMAGE" luqya-api:previous
+              echo "Previous image saved: $CURRENT_IMAGE"
+            fi
+
             echo "Stopping old container..."
             docker stop luqya-api || true
 
@@ -119,13 +130,16 @@ jobs:
               --name luqya-api \
               --restart unless-stopped \
               -p 8080:80 \
-              -v /opt/projects/Leap/openiddict.pfx:/app/openiddict.pfx \
+              -v /opt/projects/Leap/openiddict.pfx:/app/openiddict.pfx:ro \
               luqya-api:latest
 
-            echo "Deployment completed!"
+            echo "Waiting for container..."
+            sleep 10
 
-            echo "Container status:"
+            echo "Checking container status..."
             docker ps --filter "name=luqya-api"
 
-            echo "Container logs:"
+            echo "Checking container logs..."
             docker logs --tail 50 luqya-api
+
+            echo "Deployment completed!"
