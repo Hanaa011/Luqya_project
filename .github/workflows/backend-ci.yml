@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # 1. تحميل المشروع
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,7 +85,6 @@ jobs:
 
       # 13. تحويل Docker Image إلى ملف
       - name: Save Docker Image
-      - name: Save Docker Image
         run: |
           docker save luqya-api:latest -o luqya-api.tar
 
@@ -113,10 +113,15 @@ jobs:
 
             cd /opt/projects/Leap
 
+            echo "========================================"
             echo "Loading new Docker image..."
+            echo "========================================"
+
             docker load -i luqya-api.tar
 
+            echo "========================================"
             echo "Saving current image as previous..."
+            echo "========================================"
 
             if docker inspect luqya-api >/dev/null 2>&1; then
               CURRENT_IMAGE=$(docker inspect luqya-api --format '{{.Image}}')
@@ -127,13 +132,22 @@ jobs:
               fi
             fi
 
+            echo "========================================"
             echo "Stopping old container..."
+            echo "========================================"
+
             docker stop luqya-api || true
 
+            echo "========================================"
             echo "Removing old container..."
+            echo "========================================"
+
             docker rm luqya-api || true
 
+            echo "========================================"
             echo "Starting new container..."
+            echo "========================================"
+
             docker run -d \
               --name luqya-api \
               --restart unless-stopped \
@@ -141,10 +155,15 @@ jobs:
               -v /opt/projects/Leap/openiddict.pfx:/app/openiddict.pfx:ro \
               luqya-api:latest
 
+            echo "========================================"
             echo "Waiting for container to start..."
+            echo "========================================"
+
             sleep 10
 
+            echo "========================================"
             echo "Checking container status..."
+            echo "========================================"
 
             if [ "$(docker inspect -f '{{.State.Running}}' luqya-api 2>/dev/null)" != "true" ]; then
               echo "ERROR: New container is not running!"
@@ -153,9 +172,16 @@ jobs:
               exit 1
             fi
 
+            echo "Container is running successfully."
+
             docker ps --filter "name=luqya-api"
 
+            echo "========================================"
             echo "Checking container logs..."
+            echo "========================================"
+
             docker logs --tail 50 luqya-api
 
+            echo "========================================"
             echo "Deployment completed successfully!"
+            echo "========================================"
