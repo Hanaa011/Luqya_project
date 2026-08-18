@@ -21,18 +21,49 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # 3. استعادة الحزم
-      - name: Restore
-        run: dotnet restore src/Forge.HttpApi.Host/Forge.HttpApi.Host.csproj
+      # 3. تثبيت Yarn
+      - name: Setup Yarn
+        run: |
+          npm install --global yarn@1.22.22
+          yarn --version
 
-      # 4. Build + Publish
+      # 4. تثبيت ABP CLI بنفس نسخة ABP المستخدمة في المشروع
+      - name: Setup ABP CLI
+        run: |
+          dotnet tool install --global Volo.Abp.Cli --version 10.4.1
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          abp --version
+
+      # 5. استعادة حزم .NET
+      - name: Restore
+        run: |
+          dotnet restore src/Forge.HttpApi.Host/Forge.HttpApi.Host.csproj
+
+      # 6. تثبيت مكتبات ABP / JavaScript
+      - name: Install ABP Client Libraries
+        run: |
+          abp install-libs
+
+      # 7. التأكد أن مكتبات الواجهة دخلت المشروع
+      - name: Verify Client Libraries
+        run: |
+          test -d src/Forge.HttpApi.Host/wwwroot/libs
+          ls -la src/Forge.HttpApi.Host/wwwroot/libs
+
+      # 8. Build + Publish
       - name: Publish Backend
         run: |
           dotnet publish src/Forge.HttpApi.Host/Forge.HttpApi.Host.csproj \
             -c Release \
             -o src/Forge.HttpApi.Host/bin/Release/net10.0/publish
 
-      # 5. بناء Docker Image
+      # 9. التأكد أن libs دخلت داخل الـ publish
+      - name: Verify Published Libraries
+        run: |
+          test -d src/Forge.HttpApi.Host/bin/Release/net10.0/publish/wwwroot/libs
+          ls -la src/Forge.HttpApi.Host/bin/Release/net10.0/publish/wwwroot/libs
+
+      # 10. بناء Docker Image
       - name: Build Docker Image
         run: |
           docker build \
@@ -40,12 +71,18 @@ jobs:
             -f src/Forge.HttpApi.Host/Dockerfile \
             src/Forge.HttpApi.Host
 
-      # 6. تحويل Docker Image إلى ملف
+      # 11. التأكد من وجود libs داخل Docker Image
+      - name: Verify Docker Image
+        run: |
+          docker run --rm --entrypoint sh luqya-api:latest \
+            -c "ls -ld /app/wwwroot/libs && ls -la /app/wwwroot/libs | head -20"
+
+      # 12. تحويل Docker Image إلى ملف
       - name: Save Docker Image
         run: |
           docker save luqya-api:latest -o luqya-api.tar
 
-           # 7. رفع الـ Image للسيرفر
+      # 13. رفع الـ Image للسيرفر
       - name: Copy Image to Server
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -58,7 +95,7 @@ jobs:
           timeout: 120s
           command_timeout: 10m
 
-      # 8. تشغيل النسخة الجديدة
+      # 14. تشغيل النسخة الجديدة
       - name: Deploy on Server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -87,4 +124,8 @@ jobs:
 
             echo "Deployment completed!"
 
+            echo "Container status:"
             docker ps --filter "name=luqya-api"
+
+            echo "Container logs:"
+            docker logs --tail 50 luqya-api
