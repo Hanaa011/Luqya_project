@@ -108,6 +108,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+
           script: |
             set -e
 
@@ -124,12 +125,14 @@ jobs:
             echo "========================================"
 
             if docker inspect luqya-api >/dev/null 2>&1; then
+
               CURRENT_IMAGE=$(docker inspect luqya-api --format '{{.Image}}')
 
               if docker image inspect "$CURRENT_IMAGE" >/dev/null 2>&1; then
                 docker tag "$CURRENT_IMAGE" luqya-api:previous
                 echo "Previous image saved: $CURRENT_IMAGE"
               fi
+
             fi
 
             echo "========================================"
@@ -152,6 +155,8 @@ jobs:
               --name luqya-api \
               --restart unless-stopped \
               -p 8080:80 \
+              --env-file /opt/projects/Leap/luqya-api.env \
+              -e ASPNETCORE_FORWARDEDHEADERS_ENABLED=true \
               -v /opt/projects/Leap/openiddict.pfx:/app/openiddict.pfx:ro \
               luqya-api:latest
 
@@ -166,15 +171,54 @@ jobs:
             echo "========================================"
 
             if [ "$(docker inspect -f '{{.State.Running}}' luqya-api 2>/dev/null)" != "true" ]; then
+
               echo "ERROR: New container is not running!"
+
               echo "Container logs:"
               docker logs --tail 100 luqya-api
+
+              echo "Attempting rollback..."
+
+              docker rm -f luqya-api || true
+
+              if docker image inspect luqya-api:previous >/dev/null 2>&1; then
+
+                docker run -d \
+                  --name luqya-api \
+                  --restart unless-stopped \
+                  -p 8080:80 \
+                  --env-file /opt/projects/Leap/luqya-api.env \
+                  -e ASPNETCORE_FORWARDEDHEADERS_ENABLED=true \
+                  -v /opt/projects/Leap/openiddict.pfx:/app/openiddict.pfx:ro \
+                  luqya-api:previous
+
+                echo "Rollback completed."
+
+              else
+
+                echo "ERROR: Previous image not found."
+                exit 1
+
+              fi
+
               exit 1
+
             fi
 
             echo "Container is running successfully."
 
+            echo "========================================"
+            echo "Container status"
+            echo "========================================"
+
             docker ps --filter "name=luqya-api"
+
+            echo "========================================"
+            echo "Checking container environment..."
+            echo "========================================"
+
+            docker exec luqya-api sh -c \
+              'printenv | grep -E "ASPNETCORE_FORWARDEDHEADERS_ENABLED|LostFound__AI__" | sed "s/=.*/=SET/"'
 
             echo "========================================"
             echo "Checking container logs..."
