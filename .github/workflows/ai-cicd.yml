@@ -25,14 +25,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r ai_service/requirements.txt
 
       # 4. بناء Docker Image
       - name: Build Docker Image
         run: |
           docker build \
             -t luqya-ai-api:latest \
-            .
+            -f ai_service/Dockerfile \
+            ai_service
 
       # 5. التأكد أن Docker Image انبنت
       - name: Verify Docker Image
@@ -65,6 +66,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+
           script: |
             set -e
 
@@ -150,6 +152,7 @@ jobs:
             echo "AI health check status: $HEALTH_STATUS"
 
             if [ "$HEALTH_STATUS" != "200" ]; then
+
               echo "ERROR: AI health check failed!"
               echo "Rolling back to previous AI image..."
 
