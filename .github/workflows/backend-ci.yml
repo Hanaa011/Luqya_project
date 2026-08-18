@@ -39,11 +39,13 @@ jobs:
 
       # 6. Restore
       - name: Restore
-        run: dotnet restore src/Forge.HttpApi.Host/Forge.HttpApi.Host.csproj
+        run: |
+          dotnet restore src/Forge.HttpApi.Host/Forge.HttpApi.Host.csproj
 
       # 7. تثبيت مكتبات ABP و JavaScript
       - name: Install ABP Client Libraries
-        run: abp install-libs
+        run: |
+          abp install-libs
 
       # 8. التأكد أن المكتبات نزلت
       - name: Verify Client Libraries
@@ -78,7 +80,7 @@ jobs:
           docker run --rm \
             --entrypoint sh \
             luqya-api:latest \
-            -c "ls -ld /app/wwwroot/libs"
+            -c "ls -ld /app/wwwroot/libs && grep -A3 'ConnectionStrings' /app/appsettings.json"
 
       # 13. تحويل Docker Image إلى ملف
       - name: Save Docker Image
@@ -106,6 +108,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
+
             cd /opt/projects/Leap
 
             echo "Loading new Docker image..."
@@ -115,8 +119,11 @@ jobs:
 
             if docker inspect luqya-api >/dev/null 2>&1; then
               CURRENT_IMAGE=$(docker inspect luqya-api --format '{{.Image}}')
-              docker tag "$CURRENT_IMAGE" luqya-api:previous
-              echo "Previous image saved: $CURRENT_IMAGE"
+
+              if docker image inspect "$CURRENT_IMAGE" >/dev/null 2>&1; then
+                docker tag "$CURRENT_IMAGE" luqya-api:previous
+                echo "Previous image saved: $CURRENT_IMAGE"
+              fi
             fi
 
             echo "Stopping old container..."
@@ -133,13 +140,21 @@ jobs:
               -v /opt/projects/Leap/openiddict.pfx:/app/openiddict.pfx:ro \
               luqya-api:latest
 
-            echo "Waiting for container..."
+            echo "Waiting for container to start..."
             sleep 10
 
             echo "Checking container status..."
+
+            if [ "$(docker inspect -f '{{.State.Running}}' luqya-api 2>/dev/null)" != "true" ]; then
+              echo "ERROR: New container is not running!"
+              echo "Container logs:"
+              docker logs --tail 100 luqya-api
+              exit 1
+            fi
+
             docker ps --filter "name=luqya-api"
 
             echo "Checking container logs..."
             docker logs --tail 50 luqya-api
 
-            echo "Deployment completed!"
+            echo "Deployment completed successfully!"
