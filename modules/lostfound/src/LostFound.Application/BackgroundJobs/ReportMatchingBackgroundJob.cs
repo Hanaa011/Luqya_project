@@ -231,11 +231,4 @@ namespace LostFound.BackgroundJobs
             }
         }
     }
-
-    // Blob container marker for report images - adjust to whatever
-    // container/provider (Azure/S3/FileSystem) is already configured for
-    // this module's image uploads.
-    public class ReportImageContainer
-    {
-    }
 }

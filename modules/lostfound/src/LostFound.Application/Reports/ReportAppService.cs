@@ -21,17 +21,20 @@ namespace LostFound.Reports
         private readonly ReporterManager _reporterManager;
         private readonly IBackgroundJobManager _backgroundJobManager;
         private readonly IBlobContainer<ReportImageContainer> _imageContainer;
+        private readonly IImageValidator _imageValidator;
 
         public ReportAppService(
             IReportRepository reportRepository,
             ReporterManager reporterManager,
             IBackgroundJobManager backgroundJobManager,
-            IBlobContainer<ReportImageContainer> imageContainer)
+            IBlobContainer<ReportImageContainer> imageContainer,
+            IImageValidator imageValidator)
         {
             _reportRepository = reportRepository;
             _reporterManager = reporterManager;
             _backgroundJobManager = backgroundJobManager;
             _imageContainer = imageContainer;
+            _imageValidator = imageValidator;
         }
 
         // PHASE-VALIDATION-08: see IReportAppService.UploadImageAsync.
@@ -40,11 +43,19 @@ namespace LostFound.Reports
         // exact name, it never inspects the name itself, so a fixed
         // extension-less name is sufficient and avoids path-injection
         // concerns from a client-supplied file name.
+        //
+        // Task A2 (Luqya-System-Reference.md §20/§38 Issue #15): size/format
+        // validation now goes through the shared IImageValidator so this
+        // path and the AI image-search path (AiSearchAppService.SearchAsync)
+        // can never drift on what counts as a valid image. A rejected image
+        // surfaces as a clean UserFriendlyException, not a downstream blob-
+        // storage or AI-provider error.
         public async Task<string> UploadImageAsync(byte[] imageBytes)
         {
-            if (imageBytes == null || imageBytes.Length == 0)
+            var validation = _imageValidator.Validate(imageBytes);
+            if (!validation.IsValid)
             {
-                throw new ArgumentException("Image bytes must not be empty.", nameof(imageBytes));
+                throw new UserFriendlyException(validation.ErrorMessage!);
             }
 
             var blobName = GuidGenerator.Create().ToString("N");

@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using LostFound.AI;
 using LostFound.AI.Importers;
+using LostFound.Reports;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Volo.Abp;
@@ -23,6 +24,8 @@ public class LostFoundApplicationModule : AbpModule
     {
         context.Services.AddMapperlyObjectMapper<LostFoundApplicationModule>();
 
+        context.Services.AddLostFoundImageValidation(
+            context.Services.GetConfiguration());
         context.Services.AddLostFoundAiProviders(
             context.Services.GetConfiguration());
         context.Services.AddLostFoundLocalAiRuntime(

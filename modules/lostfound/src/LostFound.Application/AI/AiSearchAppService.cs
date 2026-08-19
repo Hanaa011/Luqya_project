@@ -6,19 +6,34 @@ using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using LostFound.AI.Dtos;
+using LostFound.Reports;
 
 namespace LostFound.AI
 {
     public class AiSearchAppService : ApplicationService, IAiSearchAppService
     {
+        /// <summary>
+        /// Phase 4 Part 1: hard confidence floor enforced server-side on every
+        /// search result, for every query shape (text-only, image-only, and
+        /// combined) - all three flow through this single method. Comparison
+        /// is inclusive (&gt;= 55), and this floor is applied unconditionally;
+        /// it does not depend on (and is never relaxed by) whatever the caller
+        /// sends via <see cref="AiSearchInputDto.MinimumScorePercentage"/>, so
+        /// the frontend can never cause a sub-55% result to be returned.
+        /// </summary>
+        private const double MinimumConfidenceFloorPercentage = 55.0;
+
         private readonly IAiMatchingService _aiMatchingService;
+        private readonly IImageValidator _imageValidator;
         private readonly ILogger<AiSearchAppService> _logger;
 
         public AiSearchAppService(
             IAiMatchingService aiMatchingService,
+            IImageValidator imageValidator,
             ILogger<AiSearchAppService> logger)
         {
             _aiMatchingService = aiMatchingService;
+            _imageValidator = imageValidator;
             _logger = logger;
 
             _logger.LogInformation("========== AiSearchAppService Created ==========");
@@ -49,6 +64,18 @@ namespace LostFound.AI
             {
                 imageBytes = Convert.FromBase64String(input.ImageBase64);
                 _logger.LogInformation("Image Size: {Size} bytes", imageBytes.Length);
+
+                // Task A2 (Luqya-System-Reference.md §20/§38 Issue #15): same
+                // shared validator as ReportAppService.UploadImageAsync - an
+                // oversized or unrecognized-format search image is rejected
+                // here, up front, with a clear validation error, rather than
+                // reaching an AI provider and failing downstream.
+                var validation = _imageValidator.Validate(imageBytes);
+                if (!validation.IsValid)
+                {
+                    _logger.LogWarning("Search image rejected: {Reason}", validation.ErrorMessage);
+                    throw new UserFriendlyException(validation.ErrorMessage!);
+                }
             }
 
             _logger.LogInformation("Calling IAiMatchingService.FindSimilarReportsAsync...");
@@ -63,19 +90,18 @@ namespace LostFound.AI
                 "IAiMatchingService returned {Count} result(s) before filtering.",
                 results.Count);
 
-            // Apply minimum similarity filter
-            if (input.MinimumScorePercentage.HasValue)
-            {
-                results = results
-                    //input.MinimumScorePercentage.Value
-                    .Where(x => x.ScorePercentage >= 70)
-                    .ToList();
+            // Apply the confidence floor. This always runs - not gated on
+            // input.MinimumScorePercentage.HasValue - because the backend
+            // must never return a sub-floor result regardless of what (or
+            // whether) the caller sends. See MinimumConfidenceFloorPercentage.
+            results = results
+                .Where(x => x.ScorePercentage >= MinimumConfidenceFloorPercentage)
+                .ToList();
 
-                _logger.LogInformation(
-                    "Applied minimum score filter: {Minimum}% -> {Count} result(s) remaining.",
-                    input.MinimumScorePercentage.Value,
-                    results.Count);
-            }
+            _logger.LogInformation(
+                "Applied minimum confidence floor: {Minimum}% -> {Count} result(s) remaining.",
+                MinimumConfidenceFloorPercentage,
+                results.Count);
 
             foreach (var result in results)
             {
@@ -92,6 +118,8 @@ namespace LostFound.AI
                 Description = r.Description,
                 Color = r.Color,
                 AiObjectType = r.AiObjectType,
+                Type = r.Type,
+                ImagePath = r.ImagePath,
                 ScorePercentage = r.ScorePercentage,
                 MatchReasons = r.MatchReasons,
                 MatchExplanation = r.MatchExplanation

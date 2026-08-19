@@ -21,5 +21,11 @@ namespace LostFound.Matches
             var dbSet = await GetDbSetAsync();
             return await dbSet.AnyAsync(m => m.LostReportId == lostReportId && m.FoundReportId == foundReportId);
         }
+
+        public async Task<Match?> FindByPairAsync(Guid lostReportId, Guid foundReportId)
+        {
+            var dbSet = await GetDbSetAsync();
+            return await dbSet.FirstOrDefaultAsync(m => m.LostReportId == lostReportId && m.FoundReportId == foundReportId);
+        }
     }
 }

@@ -23,5 +23,11 @@ namespace LostFound.Matches
         // recomputed - ExistsForPairAsync in MatchManager already prevents
         // duplicates).
         Task<int> RecomputeMatchesAsync(Guid reportId);
+
+        // Phase 4 Part 3: the user-initiated counterpart to the above two -
+        // claims (or dismisses) one specific Smart-Search result against
+        // one of the caller's own reports. Unlike RecomputeMatchesAsync,
+        // this never scores or touches any other candidate.
+        Task<MatchDto> ClaimAsync(ClaimMatchDto input);
     }
 }

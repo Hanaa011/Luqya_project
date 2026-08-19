@@ -89,6 +89,33 @@ namespace LostFound.AI
             public const double TextWeight = 0.55;
             public const double ImageWeight = 0.15;
 
+            // Phase 3 Part 4: a distinct weight profile used ONLY when the
+            // query has an image and no meaningful typed text (see
+            // AiMatchingService.HasMeaningfulText). Live evidence against
+            // real reports (SemanticReports/Phase-3-Part-4-*) showed the
+            // default TextWeight/ImageWeight split badly miscalibrated for
+            // this query shape: the "text" term for an image-only query is
+            // never real user text - it's an embedding of the query image's
+            // OWN AI-generated caption, compared against each candidate's
+            // description embedding (a cross-modal proxy, not a direct
+            // signal). Under the external embedding provider active in this
+            // workspace (see ConceptResolver's EngineName remarks - no local
+            // model has ever been installed here), that proxy has a high,
+            // barely-discriminating noise floor: a completely unrelated
+            // candidate and the genuine match both land in the low-80s
+            // percent range. Meanwhile raw ImageScore - real image-cosine
+            // similarity between the query photo and a candidate's own
+            // photo - is far more discriminating in the same evidence (0 for
+            // candidates with no image embedding, low-to-mid 60s for
+            // unrelated-but-embedded candidates, low-to-mid 90s for genuine
+            // matches). These two weights are a straight swap of the default
+            // pair (same 0.70 combined budget) so the image-only path trusts
+            // its one genuinely direct signal - the photo itself - as the
+            // primary driver, with the cross-modal caption text kept only as
+            // a secondary signal instead of the dominant one.
+            public const double ImageOnlyTextWeight = 0.15;
+            public const double ImageOnlyImageWeight = 0.55;
+
             public const double ObjectTypeBonus = 15;
             public const double ColorBonus = 5;
             public const double BrandBonus = 5;
@@ -225,8 +252,23 @@ namespace LostFound.AI
 
             var objectTypeRelationships = await BuildObjectTypeRelationshipCacheAsync(candidates, classification);
 
+            // Phase 3 Part 4 - see ScoringWeights.ImageOnlyTextWeight remarks.
+            // Deliberately keyed off the raw query shape (image bytes present,
+            // no meaningful typed text), not off whether queryImageEmbedding
+            // ended up non-null - if image embedding generation itself failed
+            // (Phase 3 Part 1's graceful degradation), ImageScore contributes
+            // 0 under either weight profile, so the choice of profile is moot
+            // in that case; this flag only needs to be right when there IS a
+            // real image signal to weight.
+            var isImageOnlyQuery = imageBytes != null && !HasMeaningfulText(searchText);
+            if (isImageOnlyQuery)
+            {
+                _logger.LogInformation("Image-only query shape detected - using ImageOnly scoring weight profile (Text={TextW}, Image={ImageW}).",
+                    ScoringWeights.ImageOnlyTextWeight, ScoringWeights.ImageOnlyImageWeight);
+            }
+
             var scoredCandidates = ScoreCandidates(
-                candidates, searchText, queryTextEmbedding, queryImageEmbedding, classification, objectTypeRelationships);
+                candidates, searchText, queryTextEmbedding, queryImageEmbedding, classification, objectTypeRelationships, isImageOnlyQuery);
 
             var topCandidates = scoredCandidates
                 .OrderByDescending(sc => sc.Score.Total)
@@ -333,8 +375,30 @@ namespace LostFound.AI
             float[]? imageEmbedding = null;
             if (imageBytes != null)
             {
-                imageEmbedding = await _embeddingEngine.GenerateImageEmbeddingAsync(imageBytes);
-                _logger.LogInformation("Query Image Embedding Length = {Length}", imageEmbedding.Length);
+                // Mirrors the existing try/catch already used for the same
+                // call in ReportMatchingBackgroundJob (see that class's
+                // remarks) - image embedding has no local/offline path (it's
+                // always an external-provider "caption-then-embed" call), so
+                // a provider auth failure, timeout, rate limit, or network
+                // error here is expected, recoverable operating behavior,
+                // not a reason to fail the whole search. Before this fix, an
+                // unhandled exception here propagated all the way up through
+                // AiSearchAppService.SearchAsync as a raw provider error
+                // (e.g. 401) instead of degrading to text-only scoring -
+                // confirmed live in Luqya-System-Reference.md §20/§32.
+                try
+                {
+                    imageEmbedding = await _embeddingEngine.GenerateImageEmbeddingAsync(imageBytes);
+                    _logger.LogInformation("Query Image Embedding Length = {Length}", imageEmbedding.Length);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Image search degraded to text-only: query image embedding generation failed; " +
+                        "continuing with text-only scoring for this search request.");
+                    imageEmbedding = null;
+                }
             }
 
             return (textEmbedding, imageEmbedding);
@@ -440,13 +504,27 @@ namespace LostFound.AI
         /// candidates with a positive combined score. Purely local math - no
         /// network call, no LLM.
         /// </summary>
+        /// <summary>
+        /// Phase 3 Part 4 - precise, consistent definition of "the query has
+        /// real typed text" used to decide whether the image-only scoring
+        /// weight profile applies (see <see cref="ScoringWeights.ImageOnlyTextWeight"/>).
+        /// Null/empty/whitespace-only text is obviously not meaningful; a
+        /// single stray character (e.g. an accidental space+letter left in
+        /// the box) is deliberately also excluded so it can't flip a
+        /// genuinely image-driven search into the text-dominant weight
+        /// profile - two non-whitespace characters is the minimum required.
+        /// </summary>
+        private static bool HasMeaningfulText(string? searchText) =>
+            !string.IsNullOrWhiteSpace(searchText) && searchText.Trim().Length >= 2;
+
         private List<ScoredCandidate> ScoreCandidates(
             List<Report> candidates,
             string? searchText,
             float[]? queryTextEmbedding,
             float[]? queryImageEmbedding,
             SearchClassification classification,
-            IReadOnlyDictionary<(string ObjectType, Guid? CategoryId), ObjectTypeRelationship.Relationship> objectTypeRelationships)
+            IReadOnlyDictionary<(string ObjectType, Guid? CategoryId), ObjectTypeRelationship.Relationship> objectTypeRelationships,
+            bool isImageOnlyQuery)
         {
             var scored = new List<ScoredCandidate>();
 
@@ -469,7 +547,7 @@ namespace LostFound.AI
                     ? candidate.GetNormalizedTags().Intersect(classification.NormalizedTags).ToList()
                     : new List<string>();
 
-                var score = BuildCandidateScore(candidate, searchText, queryTextEmbedding, queryImageEmbedding, classification, commonTags.Count, objectTypeRelationships);
+                var score = BuildCandidateScore(candidate, searchText, queryTextEmbedding, queryImageEmbedding, classification, commonTags.Count, objectTypeRelationships, isImageOnlyQuery);
 
                 _logger.LogInformation(
                     "Text={Text} Image={Image} ObjectType={ObjectType} Color={Color} Brand={Brand} Tag={Tag} Location={Location} Date={Date} DynamicBoost={DynamicBoost} Penalty={Penalty}",
@@ -722,7 +800,8 @@ namespace LostFound.AI
             float[]? queryImageEmbedding,
             SearchClassification classification,
             int commonTagCount,
-            IReadOnlyDictionary<(string ObjectType, Guid? CategoryId), ObjectTypeRelationship.Relationship> objectTypeRelationships)
+            IReadOnlyDictionary<(string ObjectType, Guid? CategoryId), ObjectTypeRelationship.Relationship> objectTypeRelationships,
+            bool isImageOnlyQuery)
         {
             return new CandidateScore
             {
@@ -735,7 +814,8 @@ namespace LostFound.AI
                 LocationScore = CalculateLocationScore(candidate, classification),
                 DateScore = CalculateDateScore(candidate, classification),
                 DynamicBoost = CalculateDynamicBoosts(candidate, searchText, commonTagCount),
-                Penalty = CalculatePenalty(candidate, classification, objectTypeRelationships)
+                Penalty = CalculatePenalty(candidate, classification, objectTypeRelationships),
+                IsImageOnlyQuery = isImageOnlyQuery
             };
         }
 
@@ -1057,6 +1137,8 @@ namespace LostFound.AI
                 Description = scored.Candidate.Description,
                 Color = scored.Candidate.Color,
                 AiObjectType = scored.Candidate.AiObjectType,
+                Type = scored.Candidate.Type,
+                ImagePath = scored.Candidate.ImagePath,
                 ScorePercentage = reasonSummary.Scoring.FinalScore,
                 MatchReasons = BuildStructuredReasonList(reasonSummary),
                 MatchExplanation = explanation
@@ -1255,6 +1337,16 @@ namespace LostFound.AI
             public double Penalty { get; init; }
 
             /// <summary>
+            /// Phase 3 Part 4 - true when this candidate was scored against
+            /// an image-only query (see <see cref="AiMatchingService.HasMeaningfulText"/>),
+            /// selecting <see cref="ScoringWeights.ImageOnlyTextWeight"/>/
+            /// <see cref="ScoringWeights.ImageOnlyImageWeight"/> below instead
+            /// of the default pair. Every other score component is completely
+            /// unaffected by this flag - only the Text/Image weighting differs.
+            /// </summary>
+            public bool IsImageOnlyQuery { get; init; }
+
+            /// <summary>
             /// Raw combined score, roughly 0-100 (occasionally a little
             /// above, once dynamic boosts stack) or negative when penalties
             /// dominate. This is what candidates are RANKED by - see
@@ -1262,8 +1354,8 @@ namespace LostFound.AI
             /// cosmetic remapping applied only to the displayed <c>ScorePercentage</c>.
             /// </summary>
             public double Total =>
-                (TextScore * ScoringWeights.TextWeight)
-                + (ImageScore * ScoringWeights.ImageWeight)
+                (TextScore * (IsImageOnlyQuery ? ScoringWeights.ImageOnlyTextWeight : ScoringWeights.TextWeight))
+                + (ImageScore * (IsImageOnlyQuery ? ScoringWeights.ImageOnlyImageWeight : ScoringWeights.ImageWeight))
                 + ObjectTypeScore
                 + ColorScore
                 + BrandScore

@@ -253,6 +253,40 @@ namespace LostFound.AI.Concepts
         private async Task<(Concept Concept, double Similarity)?> TryResolveBySemanticSimilarityAsync(
             string normalizedText, CancellationToken cancellationToken)
         {
+            // Real E2E finding (Phase 3 Part 3 real-world validation,
+            // 2026-08-18): BOTH MinSemanticSimilarity's 0.68 threshold AND
+            // MinTokenCountForSemanticFallback's "2 tokens is enough"
+            // conclusion above were measured exclusively against "this
+            // workspace's embedding model" (BAAI/bge-m3, local ONNX) - see
+            // both constants' own remarks. When the local runtime isn't
+            // actually installed/available and IEmbeddingEngine silently
+            // substitutes the configured external provider instead (see
+            // LocalFirstEmbeddingEngine.EngineName), this fallback's entire
+            // empirical calibration no longer applies to what's actually
+            // running - live-confirmed, reproducibly, against the real
+            // OpenAI text-embedding-3-small substitute active in that
+            // session: two-word queries that clear both existing guards
+            // still produced severe false-positive concept matches no
+            // reasonable threshold should accept - "Running Shoe" resolved
+            // to the unrelated concept "Phase One" at similarity=0.96, and
+            // "silver wristwatch" resolved to "USB Drive" at
+            // similarity=0.74 - both repeatable, not one-off LLM sampling
+            // noise (this technique doesn't call an LLM at all). Rather than
+            // guess a new threshold number with no equivalent benchmark
+            // behind it, this fallback now requires the LOCAL engine
+            // specifically - EngineName starts with "Local:" only when
+            // LocalFirstEmbeddingEngine.IsAvailable is true (see that
+            // class) - falling through to the same safe "no semantic match"
+            // default already used when the token-count guard fails, rather
+            // than trusting a technique whose only validation doesn't hold
+            // for whatever provider is actually serving the request. Exact
+            // alias/synonym resolution (tried before this method is ever
+            // called) is completely unaffected either way.
+            if (!embeddingEngine.EngineName.StartsWith("Local:", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
             // See MinTokenCountForSemanticFallback's remarks: single-word
             // input is a proven-unreliable input class for this technique -
             // skip straight to "no semantic match" rather than risk a

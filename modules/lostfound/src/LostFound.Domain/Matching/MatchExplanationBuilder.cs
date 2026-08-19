@@ -10,22 +10,34 @@ namespace LostFound.Matching
 
             if (scorePercentage >= 90)
             {
-                level = "very high semantic similarity / ÊØÇÈÞ ÏáÇáí ÚÇáò ÌÏðÇ";
+                level = "very high semantic similarity / ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½";
             }
             else if (scorePercentage >= 80)
             {
-                level = "high semantic similarity / ÊØÇÈÞ ÏáÇáí ÚÇáò";
+                level = "high semantic similarity / ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½";
             }
             else if (scorePercentage >= 70)
             {
-                level = "moderate semantic similarity / ÊØÇÈÞ ÏáÇáí ãÊæÓØ";
+                level = "moderate semantic similarity / ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½";
             }
             else
             {
-                level = "low semantic similarity / ÊØÇÈÞ ÏáÇáí ãäÎÝÖ";
+                level = "low semantic similarity / ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½";
             }
 
             return $"AI match ({providerName}): {scorePercentage:0.00}% - {level}. Descriptions compared by meaning, not exact wording.";
+        }
+
+        // Phase 4 Part 3: honestly distinct from Build() above - this Match
+        // was not produced by MatchManager's own background scoring pass at
+        // all; a user found it through Smart Search and claimed it
+        // themselves. Reusing Build()'s "AI match" wording here would
+        // misrepresent the provenance, so this is a deliberately separate
+        // template rather than a parameter added to the existing one.
+        public static string BuildForUserClaim(double observedScorePercentage)
+        {
+            return $"Claimed via Smart Search by the reporting user, at {observedScorePercentage:0.00}% shown at the time - not an automatic AI match. / " +
+                   "ØªÙ… Ø±Ø¨Ø· Ù‡Ø°Ù‡ Ø§Ù„Ù…Ø·Ø§Ø¨Ù‚Ø© ÙŠØ¯ÙˆÙŠÙ‹Ø§ Ø¹Ø¨Ø± Ø§Ù„Ø¨Ø­Ø« Ø§Ù„Ø°ÙƒÙŠ Ù…Ù† Ù‚Ø¨Ù„ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ØŒ ÙˆÙ„ÙŠØ³Øª Ù…Ø·Ø§Ø¨Ù‚Ø© ØªÙ„Ù‚Ø§Ø¦ÙŠØ© Ø¨Ø§Ù„Ø°ÙƒØ§Ø¡ Ø§Ù„Ø§ØµØ·Ù†Ø§Ø¹ÙŠ.";
         }
     }
 }
