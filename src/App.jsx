@@ -92,7 +92,14 @@ export default function App() {
             }
           />
           <Route path="/match/:id" element={<Match />} />
-         <Route path="/match/:id/contact" element={<Contact />} />
+          <Route
+  path="/match/:id/contact"
+  element={
+    <RequireAuth>
+      <Contact />
+    </RequireAuth>
+  }
+/>
 
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/register" element={<Register />} />

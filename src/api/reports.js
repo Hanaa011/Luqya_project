@@ -1,4 +1,5 @@
 import { api } from "./httpClient";
+import { API_BASE_URL } from "./config";
 
 // ReportAppService.GetListAsync(GetReportListDto) -> GET api/app/report -> PagedResultDto<ReportDto>
 // NOTE: GetReportListDto has no CreatorId property, and GetListAsync's
@@ -21,11 +22,35 @@ export function getReport(id, signal) {
   return api.get(`/api/app/report/${id}`, undefined, signal);
 }
 
+// IReportAppService.UploadImageAsync(byte[] imageBytes) -> POST api/app/report/upload-image
+// -> string (the blob name — pass it as CreateReportDto.imagePath /
+// UpdateReportDto.imagePath). The body is the base64 image string itself,
+// NOT wrapped in an object — ASP.NET Core binds a single byte[] parameter
+// from a raw JSON string body. Verified live against the running host
+// (Task B, see SemanticReports/Image-Search-Implementation-Report.md).
+export function uploadReportImage(imageBase64) {
+  return api.post("/api/app/report/upload-image", imageBase64);
+}
+
+// Task 6 (Phase 3 Part 2 real-world validation): ReportDto.imagePath is a bare
+// blob name (e.g. "af92694fc89..."), not a URL — used directly as an <img src>
+// it can only ever 404. GET api/app/report/image/{blobName} is a real MVC
+// controller (ReportImagesController, LostFound.HttpApi), not an
+// ApplicationService, specifically so it can return actual image bytes with a
+// real Content-Type instead of a JSON/base64 wrapper. Anonymous, so a plain
+// <img> tag (which can't attach the Bearer token) can load it directly.
+export function reportImageUrl(imagePath) {
+  if (!imagePath) return null;
+  return `${API_BASE_URL}/api/app/report/image/${encodeURIComponent(imagePath)}`;
+}
+
 // ForgeService.ReportPOSTAsync(CreateReportDto) -> POST api/app/report -> ReportDto
 // Verified against LostFound.Application.Contracts/Reports/Dtos/CreateReportDto.cs —
 // reporterName/reporterPhone/reporterEmail/preferredContact are real,
 // current fields (ignored server-side for authenticated users, required
-// — phone specifically — for guests).
+// — phone specifically — for guests). `imagePath` IS a real, verified field
+// (see Task B) — set it from uploadReportImage()'s returned blob name to
+// actually persist an attached image with the report.
 export function createReport({
   locationId,
   locationDetails,

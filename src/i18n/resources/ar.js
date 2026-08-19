@@ -40,12 +40,21 @@ export default {
   searchBtn: "بحث",
   searchLoading: "جارٍ البحث...",
   searchEmpty: "لا توجد بلاغات مطابقة بعد. جرّب وصفًا مختلفًا.",
+  searchEmptyImageOnlyHint: "إذا بحثت بالصورة فقط، جرّب إضافة وصف نصي قصير أيضًا — هذا يحسّن النتائج بشكل ملحوظ.",
   searchErrorGeneric: "تعذّر إكمال البحث. حاول مرة أخرى.",
   searchRetry: "أعد المحاولة",
   searchFoundHint: "البحث في بلاغات من عثروا على أغراض — الحالة المعتادة عند محاولة استرجاع غرض مفقود.",
   searchLostHint: "البحث في بلاغات من فقدوا أغراضًا.",
   searchOwnExcludedNote: "تم استبعاد بلاغاتك الخاصة من هذه النتائج.",
+  // Phase 4 Part 4
+  searchAllExcludedNote: "تم العثور على تطابق، لكنه مخفي حاليًا من هذه النتائج.",
+  searchDismissedExcludedNote: "تم استبعاد نتيجة سبق أن حدّدتها كـ«ليس غرضي» من هذه النتائج.",
   searchTypeAll: "الكل",
+
+  // Phase 4 Part 3 — claim action on Smart Search results
+  claimMineCta: "هذا غرضي",
+  claimNotMineCta: "ليس غرضي",
+
   notifUnavailable: "الإشعارات غير متاحة بعد — أرسل بلاغًا أولًا حتى نتعرف عليك.",
 
   notifEmpty: "لا توجد إشعارات بعد.",
@@ -156,6 +165,14 @@ export default {
   fldDate: "التاريخ",
   fldPhoto: "أضف صورة",
   photoHint: "اسحب وأفلت أو انقر للرفع",
+  removePhotoCta: "إزالة الصورة",
+
+  // Task C — البحث بالصورة الذكي
+  searchByImageLabel: "ابحث بالصورة",
+  searchByImageHint: "أفلت صورة أو انقر لإرفاقها — ابحث بالصورة أو النص أو كليهما",
+  searchImageRemoveCta: "إزالة الصورة",
+  searchImageReplaceCta: "استبدال الصورة",
+  searchingByImageLabel: "جارٍ تحليل الصورة…",
   aiSuggests: "اقتراحات الذكاء",
   submitReport: "إرسال البلاغ",
   voiceInputLabel: "إدخال صوتي",

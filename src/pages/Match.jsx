@@ -21,7 +21,7 @@ import {
 
 import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
-import { deleteReport, getReport, updateReport } from "../api/reports";
+import { deleteReport, getReport, reportImageUrl, updateReport } from "../api/reports";
 import { acceptMatch, listMatches, rejectMatch } from "../api/matches";
 import { fetchMyReports } from "../lib/myReports";
 import {
@@ -85,7 +85,6 @@ export default function Match() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fromReportId = searchParams.get("from");
-  const fromSmartSearch = searchParams.get("source") === "smart-search";
   const { t, lang } = useI18n();
   const { profile, userId } = useAuth();
 
@@ -222,17 +221,8 @@ export default function Match() {
 
   const isOwnedReport = report ? myReportIds.has(report.id) : false;
   const ownsPairedReport = pairedReport ? myReportIds.has(pairedReport.id) : false;
-  const hasExplicitMatchContext = Boolean(match && pairedReport && fromReportId);
   const isReviewingMatch =
-    Boolean(match && pairedReport) &&
-    !isOwnedReport &&
-    (ownsPairedReport || hasExplicitMatchContext);
-  const canOpenContact =
-    !isOwnedReport && (isReviewingMatch || fromSmartSearch);
-  const canShowMatchDecision =
-    report?.status !== ReportStatus.CLOSED &&
-    match?.status === MatchStatus.PENDING &&
-    (ownsPairedReport || Boolean(fromReportId));
+    Boolean(match && pairedReport) && !isOwnedReport && ownsPairedReport;
   const isLost = report?.type === ReportType.LOST;
   const details = useMemo(() => splitDescription(report, t("browseTitle")), [report, t]);
   const score = getMatchScore(match);
@@ -389,7 +379,7 @@ export default function Match() {
             <article className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-soft">
               {report.imagePath && (
                 <div className="aspect-[16/8] overflow-hidden bg-stone-100 sm:aspect-[16/7]">
-                  <img src={report.imagePath} alt="" className="size-full object-cover" />
+                  <img src={reportImageUrl(report.imagePath)} alt="" className="size-full object-cover" />
                 </div>
               )}
 
@@ -694,7 +684,7 @@ export default function Match() {
                           ur: "یہ رپورٹ بند ہے اور مزید کارروائی کی ضرورت نہیں۔",
                         })}
                       </div>
-                    ) : canOpenContact ? (
+                    ) : profile && isReviewingMatch ? (
                       <Link
                         to={`/match/${report.id}/contact`}
                         className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
@@ -707,9 +697,13 @@ export default function Match() {
                         </span>
                         <ArrowRight className={`size-4 ${lang === "ar" || lang === "ur" ? "rotate-180" : ""}`} />
                       </Link>
+                    ) : !profile ? (
+                      <Link to="/auth/login" className="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25">
+                        {copy(lang, { ar: "سجّل الدخول للتواصل", en: "Log in to contact", ur: "رابطے کے لیے لاگ ان کریں" })}
+                      </Link>
                     ) : null}
 
-                    {canShowMatchDecision && (
+                    {report.status !== ReportStatus.CLOSED && ownsPairedReport && match?.status === MatchStatus.PENDING && (
                       <div className="mt-4 border-t border-border pt-4">
                         <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
                           {copy(lang, {
@@ -719,51 +713,24 @@ export default function Match() {
                           })}
                         </p>
                         <div className="grid grid-cols-2 gap-2">
-                          {profile ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handleMatchDecision("accept")}
-                                disabled={Boolean(workingAction)}
-                                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-success px-3 text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 hover:shadow-sm disabled:pointer-events-none disabled:opacity-50"
-                              >
-                                {workingAction === "accept" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                                {copy(lang, { ar: "تأكيد المطابقة", en: "Confirm match", ur: "میچ کی تصدیق" })}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleMatchDecision("reject")}
-                                disabled={Boolean(workingAction)}
-                                className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-border px-3 text-xs font-bold text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:bg-stone-100 hover:text-foreground hover:shadow-sm disabled:pointer-events-none disabled:opacity-50"
-                              >
-                                <XCircle className="size-4" />
-                                {copy(lang, { ar: "ليست مطابقة", en: "Not a match", ur: "یہ میچ نہیں" })}
-                              </button>
-                            </>
-                          ) : (
-                            <div className="col-span-2 rounded-2xl bg-stone-50 px-4 py-4">
-                              <p className="text-sm font-semibold">
-                                {copy(lang, {
-                                  ar: "سجّل الدخول لتأكيد المطابقة",
-                                  en: "Log in to confirm this match",
-                                  ur: "میچ کی تصدیق کے لیے لاگ ان کریں",
-                                })}
-                              </p>
-                              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                                {copy(lang, {
-                                  ar: "يمكنك مشاهدة التفاصيل والتواصل الآن، لكن تأكيد أو رفض المطابقة يتطلب تسجيل الدخول.",
-                                  en: "You can view the details and contact the reporter now, but confirming or rejecting the match requires login.",
-                                  ur: "آپ ابھی تفصیلات دیکھ اور رابطہ کر سکتے ہیں، لیکن میچ کی تصدیق یا رد کرنے کے لیے لاگ ان ضروری ہے۔",
-                                })}
-                              </p>
-                              <Link
-                                to={`/auth/login?returnTo=${encodeURIComponent(`/match/${report.id}?from=${fromReportId}`)}`}
-                                className="mt-3 inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                              >
-                                {copy(lang, { ar: "تسجيل الدخول", en: "Log in", ur: "لاگ ان" })}
-                              </Link>
-                            </div>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleMatchDecision("accept")}
+                            disabled={Boolean(workingAction)}
+                            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-success px-3 text-xs font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 hover:shadow-sm disabled:pointer-events-none disabled:opacity-50"
+                          >
+                            {workingAction === "accept" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                            {copy(lang, { ar: "تأكيد المطابقة", en: "Confirm match", ur: "میچ کی تصدیق" })}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMatchDecision("reject")}
+                            disabled={Boolean(workingAction)}
+                            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-border px-3 text-xs font-bold text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:bg-stone-100 hover:text-foreground hover:shadow-sm disabled:pointer-events-none disabled:opacity-50"
+                          >
+                            <XCircle className="size-4" />
+                            {copy(lang, { ar: "ليست مطابقة", en: "Not a match", ur: "یہ میچ نہیں" })}
+                          </button>
                         </div>
                       </div>
                     )}

@@ -40,12 +40,21 @@ export default {
   searchBtn: "تلاش کریں",
   searchLoading: "تلاش جاری ہے...",
   searchEmpty: "ابھی کوئی مماثل رپورٹ نہیں ملی۔ مختلف الفاظ میں بیان کریں۔",
+  searchEmptyImageOnlyHint: "کیا آپ نے صرف تصویر سے تلاش کی؟ ایک مختصر تحریری تفصیل شامل کرنے سے نتائج نمایاں طور پر بہتر ہو جاتے ہیں۔",
   searchErrorGeneric: "تلاش مکمل نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
   searchRetry: "دوبارہ کوشش کریں",
   searchFoundHint: "ان لوگوں کی رپورٹس تلاش کی جا رہی ہیں جنہیں کچھ ملا — عام طور پر جب آپ گمشدہ چیز واپس لینے کی کوشش کر رہے ہوں۔",
   searchLostHint: "ان لوگوں کی رپورٹس تلاش کی جا رہی ہیں جنہوں نے کچھ کھویا۔",
   searchOwnExcludedNote: "آپ کی اپنی رپورٹس ان نتائج سے خارج کر دی گئی ہیں۔",
+  // Phase 4 Part 4
+  searchAllExcludedNote: "ایک میچ ملا، لیکن یہ فی الحال ان نتائج سے چھپا ہوا ہے۔",
+  searchDismissedExcludedNote: "ایک نتیجہ جسے آپ نے پہلے \"یہ میری چیز نہیں\" نشان زد کیا تھا، ان نتائج سے خارج کر دیا گیا۔",
   searchTypeAll: "دونوں",
+
+  // Phase 4 Part 3 — claim action on Smart Search results
+  claimMineCta: "یہ میری چیز ہے",
+  claimNotMineCta: "یہ میری چیز نہیں",
+
   notifUnavailable: "اطلاعات ابھی دستیاب نہیں — پہلے ایک رپورٹ جمع کروائیں تاکہ ہم آپ کو پہچان سکیں۔",
 
   notifEmpty: "ابھی کوئی اطلاع نہیں۔",
@@ -156,6 +165,14 @@ export default {
   fldDate: "تاریخ",
   fldPhoto: "تصویر شامل کریں",
   photoHint: "کھینچ کر چھوڑیں یا اپ لوڈ کے لیے کلک کریں",
+  removePhotoCta: "تصویر ہٹائیں",
+
+  // Task C — سمارٹ تصویری تلاش
+  searchByImageLabel: "تصویر سے تلاش کریں",
+  searchByImageHint: "تصویر ڈراپ کریں یا منسلک کرنے کے لیے کلک کریں — تصویر، متن، یا دونوں سے تلاش کریں",
+  searchImageRemoveCta: "تصویر ہٹائیں",
+  searchImageReplaceCta: "تصویر تبدیل کریں",
+  searchingByImageLabel: "تصویر کا تجزیہ ہو رہا ہے…",
   aiSuggests: "اے آئی تجاویز",
   submitReport: "رپورٹ جمع کروائیں",
   voiceInputLabel: "صوتی ان پٹ",

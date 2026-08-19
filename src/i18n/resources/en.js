@@ -40,12 +40,23 @@ export default {
   searchBtn: "Search",
   searchLoading: "Searching...",
   searchEmpty: "No matching reports yet. Try describing it differently.",
+  searchEmptyImageOnlyHint: "Searched with a photo only? Adding a short text description too noticeably improves results.",
   searchErrorGeneric: "Couldn't complete the search. Please try again.",
   searchRetry: "Try again",
   searchFoundHint: "Searching reports from people who found something — the usual case when you're trying to recover a lost item.",
   searchLostHint: "Searching reports from people who lost something.",
   searchOwnExcludedNote: "Your own reports were excluded from these results.",
+  // Phase 4 Part 4: shown instead of the generic "no results" message when
+  // a match genuinely existed but was hidden by an exclusion filter — see
+  // searchOwnExcludedNote/searchDismissedExcludedNote below for which one.
+  searchAllExcludedNote: "A match was found, but it's currently hidden from these results.",
+  searchDismissedExcludedNote: "A result you previously marked \"not my item\" was excluded from these results.",
   searchTypeAll: "Both",
+
+  // Phase 4 Part 3 — claim action on Smart Search results
+  claimMineCta: "This is my item",
+  claimNotMineCta: "Not my item",
+
   notifUnavailable: "Notifications aren't available yet — submit a report first so we know who you are.",
 
   notifEmpty: "No notifications yet.",
@@ -156,9 +167,17 @@ export default {
   fldDate: "Date",
   fldPhoto: "Add a photo",
   photoHint: "Drag and drop or click to upload",
+  removePhotoCta: "Remove photo",
   aiSuggests: "AI suggestions",
   submitReport: "Submit report",
   voiceInputLabel: "Voice input",
+
+  // Task C — Smart Image Search
+  searchByImageLabel: "Search by image",
+  searchByImageHint: "Drop a photo or click to attach — search by image, text, or both",
+  searchImageRemoveCta: "Remove image",
+  searchImageReplaceCta: "Replace image",
+  searchingByImageLabel: "Analyzing image…",
 
   fldTitlePh: "Brown leather wallet",
   fldLocationPh: "King Khalid Airport",

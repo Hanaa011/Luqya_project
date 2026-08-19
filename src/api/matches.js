@@ -14,3 +14,18 @@ export function acceptMatch(id) {
 export function rejectMatch(id) {
   return api.post(`/api/app/match/${id}/reject`);
 }
+
+// Phase 4 Part 3: IMatchAppService.ClaimAsync(ClaimMatchDto) -> POST
+// api/app/match/claim -> MatchDto. The "this is my item"/"not my item"
+// action from a Smart Search result — searchResultReportId is the result
+// being claimed, ownReportId is whichever of the caller's own reports it
+// relates to, observedScorePercentage is the exact score already shown
+// for that result card (never recomputed client- or server-side).
+export function claimMatch({ searchResultReportId, ownReportId, observedScorePercentage, isMine }) {
+  return api.post("/api/app/match/claim", {
+    searchResultReportId,
+    ownReportId,
+    observedScorePercentage,
+    isMine,
+  });
+}

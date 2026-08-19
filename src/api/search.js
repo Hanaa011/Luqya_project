@@ -17,8 +17,9 @@ export function aiSearch({ text, imageBase64, type, maxResults = 10, minimumScor
 }
 
 // AiSearchAppService.SearchAsync does `Convert.FromBase64String(input.ImageBase64)`
-// server-side — base64 is a verified, real field for this endpoint
-// specifically (unlike CreateReportDto.imagePath, which is not).
+// server-side — base64 is a verified, real field for this endpoint.
+// (CreateReportDto.imagePath takes a blob name instead, from
+// reports.js's uploadReportImage() — see Task B.)
 export function imageFileToBase64(file) {
   return new Promise((resolve, reject) => {
     if (!file) return resolve(undefined);

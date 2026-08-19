@@ -19,7 +19,7 @@ import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
 import DammaMark from "../components/DammaMark";
 import GuestContactFields from "../components/GuestContactFields";
-import { createReport } from "../api/reports";
+import { createReport, reportImageUrl, uploadReportImage } from "../api/reports";
 import { listLocations, createLocation } from "../api/locations";
 import { aiSearch, imageFileToBase64 } from "../api/search";
 import { ReportType, PreferredContactType } from "../api/enums";
@@ -28,6 +28,33 @@ import { isValidSaudiMobile } from "../lib/saudiPhone";
 import { setKnownReporterId } from "../api/reporterIdentity";
 import { fetchMyReports } from "../lib/myReports";
 import { buildReporterFields } from "../lib/reporterFields";
+import { validateImageFile, ImageValidationReason } from "../lib/imageValidation";
+
+// Task B: one localized message per ImageValidationReason code, shared shape
+// with ReportFound.jsx and SmartSearch.jsx (Task C) so the same rejection
+// always reads the same way anywhere in the app.
+function imageValidationMessage(tr, reason) {
+  switch (reason) {
+    case ImageValidationReason.TOO_LARGE:
+      return tr({
+        ar: "حجم الصورة كبير جدًا (الحد الأقصى 8 ميجابايت).",
+        en: "That photo is too large (8 MB maximum).",
+        ur: "یہ تصویر بہت بڑی ہے (زیادہ سے زیادہ 8 MB)۔",
+      });
+    case ImageValidationReason.INVALID_FORMAT:
+      return tr({
+        ar: "صيغة الصورة غير مدعومة. الرجاء استخدام JPEG أو PNG أو WEBP.",
+        en: "That file isn't a supported image. Please use JPEG, PNG, or WEBP.",
+        ur: "یہ فائل معاون تصویر نہیں ہے۔ براہ کرم JPEG، PNG، یا WEBP استعمال کریں۔",
+      });
+    default:
+      return tr({
+        ar: "تعذّر قراءة هذه الصورة. جرّب صورة أخرى.",
+        en: "Couldn't read that photo. Please try a different file.",
+        ur: "یہ تصویر پڑھی نہیں جا سکی۔ دوسری فائل آزمائیں۔",
+      });
+  }
+}
 
 const STAGES = [
   { key: "saved", labelKey: "stageSaved", Icon: Check },
@@ -55,8 +82,9 @@ export default function ReportLost() {
   const [lostFoundDate, setLostFoundDate] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [imageError, setImageError] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [matches, setMatches] = useState([]);
-  const [createdReportId, setCreatedReportId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [knownLocations, setKnownLocations] = useState([]);
   const [guest, setGuest] = useState({
@@ -97,10 +125,29 @@ export default function ReportLost() {
   };
   const suggestions = description.length > 8 ? CATEGORY_OPTIONS[lang] ?? CATEGORY_OPTIONS.en : [];
 
-  function handleFile(file) {
+  // Task B: content-inspection validation (magic bytes, not just the
+  // browser's accept="image/*" hint) before the file is ever kept around or
+  // previewed — an invalid file is rejected here with a clear, localized
+  // message, never silently dropped.
+  async function handleFile(file) {
+    if (!file) {
+      if (preview) URL.revokeObjectURL(preview);
+      setImageFile(null);
+      setPreview(null);
+      setImageError(null);
+      return;
+    }
+
+    const reason = await validateImageFile(file);
+    if (reason) {
+      setImageError(imageValidationMessage(tr, reason));
+      return;
+    }
+
     if (preview) URL.revokeObjectURL(preview);
+    setImageError(null);
     setImageFile(file);
-    setPreview(file ? URL.createObjectURL(file) : null);
+    setPreview(URL.createObjectURL(file));
   }
 
   function updateGuest(field, value) {
@@ -136,7 +183,6 @@ export default function ReportLost() {
     setSubmitting(true);
     setPhase("searching");
     setStageIndex(0);
-    setCreatedReportId(null);
 
     const stageTimer = window.setInterval(() => {
       setStageIndex((i) => Math.min(i + 1, STAGES.length - 2)); // holds at "matching"
@@ -145,12 +191,35 @@ export default function ReportLost() {
     try {
       const locationId = await resolveLocationId(locationText || "—");
 
+      const imageBase64 = await imageFileToBase64(imageFile);
+
+      // Task B: upload the image to blob storage BEFORE creating the
+      // report, so CreateReportDto.imagePath can be populated - previously
+      // this base64 conversion only ever fed the one-shot aiSearch call
+      // below and was never persisted with the report itself
+      // (Luqya-System-Reference.md §9/§38 High #7). A failed upload aborts
+      // submission with its own distinct error rather than silently
+      // creating a report with no image.
+      let imagePath;
+      if (imageBase64) {
+        setUploadingImage(true);
+        try {
+          imagePath = await uploadReportImage(imageBase64);
+        } catch (uploadErr) {
+          uploadErr.isImageUpload = true;
+          throw uploadErr;
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+
       const report = await createReport({
         locationId,
         locationDetails: locationText,
         type: ReportType.LOST,
         description: `${title ? title + " — " : ""}${description}`,
         lostFoundDate: lostFoundDate ? new Date(lostFoundDate).toISOString() : undefined,
+        imagePath,
         isItemWithFinder: false,
         ...buildReporterFields({
           profile: profile && !profileHasPhone ? { ...profile, phoneNumber: profilePhone } : profile,
@@ -162,11 +231,10 @@ export default function ReportLost() {
         setKnownReporterId(report.reporterId);
       }
 
-      setCreatedReportId(report?.id ?? null);
-
-      const imageBase64 = await imageFileToBase64(imageFile);
-
-      // Searching within FOUND reports for something matching what was lost.
+      // Preserved: immediate candidate suggestions at creation time (Task B
+      // point 4) - additive to, not a replacement for, the persisted
+      // imagePath above. Searching within FOUND reports for something
+      // matching what was lost.
       let results = await aiSearch({
         text: description,
         imageBase64,
@@ -217,6 +285,17 @@ export default function ReportLost() {
             ur: "یہ فون نمبر پہلے سے کسی دوسرے اکاؤنٹ سے رجسٹرڈ ہے۔",
           })
         );
+      } else if (err.isImageUpload) {
+        // Task B point 6: a distinct, retry-able message - the report was
+        // never created, so the user can just fix/remove the photo and
+        // resubmit the same form (all other fields are preserved).
+        setErrorMsg(
+          tr({
+            ar: "تعذّر رفع الصورة. تحقق من الصورة وحاول الإرسال مرة أخرى.",
+            en: "Couldn't upload the photo. Please check it and try submitting again.",
+            ur: "تصویر اپ لوڈ نہیں ہو سکی۔ اسے چیک کریں اور دوبارہ جمع کروائیں۔",
+          })
+        );
       } else {
         setErrorMsg(
           err.message ||
@@ -249,6 +328,7 @@ export default function ReportLost() {
             suggestions={suggestions}
             preview={preview}
             handleFile={handleFile}
+            imageError={imageError}
             handleSubmit={handleSubmit}
             errorMsg={errorMsg}
             isGuest={!profile}
@@ -267,12 +347,10 @@ export default function ReportLost() {
         )}
 
         {phase === "searching" && (
-          <SearchingView t={t} stageIndex={stageIndex} preview={preview} />
+          <SearchingView t={t} tr={tr} stageIndex={stageIndex} preview={preview} uploadingImage={uploadingImage} />
         )}
 
-        {phase === "results" && (
-          <MatchesView t={t} lang={lang} matches={matches} sourceReportId={createdReportId} />
-        )}
+        {phase === "results" && <MatchesView t={t} lang={lang} matches={matches} />}
         {phase === "empty" && <EmptyView t={t} />}
       </div>
     </section>
@@ -312,6 +390,7 @@ function FormView({
   suggestions,
   preview,
   handleFile,
+  imageError,
   handleSubmit,
   errorMsg,
   isGuest,
@@ -442,6 +521,16 @@ function FormView({
               className="hidden"
             />
           </label>
+          {preview && (
+            <button
+              type="button"
+              onClick={() => handleFile(null)}
+              className="mt-2 text-xs font-semibold text-muted-foreground hover:text-error transition-colors"
+            >
+              {t("removePhotoCta")}
+            </button>
+          )}
+          {imageError && <p className="text-xs text-error mt-2">{imageError}</p>}
         </Field>
 
         {isGuest && (
@@ -480,7 +569,7 @@ function FormView({
   );
 }
 
-function SearchingView({ t, stageIndex, preview }) {
+function SearchingView({ t, tr, stageIndex, preview, uploadingImage }) {
   const progress = ((stageIndex + 1) / STAGES.length) * 100;
 
   return (
@@ -503,8 +592,12 @@ function SearchingView({ t, stageIndex, preview }) {
         {t("aiAtWork")}
       </div>
 
+      {/* Task B point 6: a distinct loading state for the image-upload step,
+          which happens before the AI classification stages below. */}
       <h2 className="font-display text-2xl lg:text-3xl font-bold mb-10 min-h-10">
-        {t(STAGES[stageIndex].labelKey)}
+        {uploadingImage
+          ? tr({ ar: "جارٍ رفع الصورة…", en: "Uploading photo…", ur: "تصویر اپ لوڈ ہو رہی ہے…" })
+          : t(STAGES[stageIndex].labelKey)}
       </h2>
 
       <div className="h-1.5 rounded-full bg-stone-100 overflow-hidden mb-10">
@@ -544,7 +637,7 @@ function SearchingView({ t, stageIndex, preview }) {
   );
 }
 
-function MatchesView({ t, matches, sourceReportId }) {
+function MatchesView({ t, matches }) {
   return (
     <div className="animate-rise-in">
       <div className="text-center mb-12">
@@ -564,11 +657,15 @@ function MatchesView({ t, matches, sourceReportId }) {
         {matches.map((m) => (
           <Link
             key={m.reportId}
-            to={sourceReportId ? `/match/${m.reportId}?from=${sourceReportId}&source=report-form` : `/match/${m.reportId}?source=report-form`}
+            to={`/match/${m.reportId}`}
             className="group rounded-[1.75rem] border border-border bg-card overflow-hidden shadow-soft hover:shadow-luxe hover:-translate-y-1 transition-all"
           >
-            <div className="aspect-[16/10] bg-gradient-to-br from-stone-100 to-stone-200 relative grid place-items-center">
-              <DammaMark className="size-9 text-primary/40" />
+            <div className="aspect-[16/10] bg-gradient-to-br from-stone-100 to-stone-200 relative grid place-items-center overflow-hidden">
+              {m.imagePath ? (
+                <img src={reportImageUrl(m.imagePath)} alt="" className="absolute inset-0 size-full object-cover" />
+              ) : (
+                <DammaMark className="size-9 text-primary/40" />
+              )}
               <span className="absolute top-3 end-3 bg-primary text-primary-foreground text-xs font-bold font-mono px-2.5 py-1 rounded-full">
                 {Math.round(m.scorePercentage)}%
               </span>
