@@ -76,7 +76,6 @@ export default function ReportLost() {
 
   const [phase, setPhase] = useState("form"); // form | searching | results | empty
   const [stageIndex, setStageIndex] = useState(0);
-  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [locationText, setLocationText] = useState("");
   const [lostFoundDate, setLostFoundDate] = useState("");
@@ -217,7 +216,7 @@ export default function ReportLost() {
         locationId,
         locationDetails: locationText,
         type: ReportType.LOST,
-        description: `${title ? title + " — " : ""}${description}`,
+        description,
         lostFoundDate: lostFoundDate ? new Date(lostFoundDate).toISOString() : undefined,
         imagePath,
         isItemWithFinder: false,
@@ -317,8 +316,6 @@ export default function ReportLost() {
           <FormView
             t={t}
             dir={dir}
-            title={title}
-            setTitle={setTitle}
             description={description}
             setDescription={setDescription}
             locationText={locationText}
@@ -379,8 +376,6 @@ function Field({ label, hint, icon: Icon, children }) {
 function FormView({
   t,
   dir,
-  title,
-  setTitle,
   description,
   setDescription,
   locationText,
@@ -435,17 +430,6 @@ function FormView({
         onSubmit={handleSubmit}
         className="bg-card border border-border rounded-[2rem] p-8 lg:p-12 shadow-soft space-y-8"
       >
-        <Field label={t("fldTitle")}>
-          <input
-            type="text"
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={t("fldTitlePh")}
-            className="w-full px-5 py-4 rounded-2xl bg-stone-50 border border-stone-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
-          />
-        </Field>
-
         <Field label={t("fldDesc")} hint={t("aiSuggests")}>
           <div className="relative">
             <textarea
@@ -658,6 +642,7 @@ function MatchesView({ t, matches }) {
           <Link
             key={m.reportId}
             to={`/match/${m.reportId}`}
+            state={{ scorePercentage: m.scorePercentage }}
             className="group rounded-[1.75rem] border border-border bg-card overflow-hidden shadow-soft hover:shadow-luxe hover:-translate-y-1 transition-all"
           >
             <div className="aspect-[16/10] bg-gradient-to-br from-stone-100 to-stone-200 relative grid place-items-center overflow-hidden">

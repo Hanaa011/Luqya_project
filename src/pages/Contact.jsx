@@ -22,9 +22,8 @@ function copy(lang, values) {
   return values[lang] ?? values.en;
 }
 
-function reportTitle(report, fallback) {
-  const [maybeTitle, ...rest] = (report?.description ?? "").split(" — ");
-  return rest.length ? maybeTitle : report?.aiObjectType || fallback;
+function reportSummary(report, fallback) {
+  return report?.description || report?.aiObjectType || fallback;
 }
 
 export default function Contact() {
@@ -184,7 +183,7 @@ export default function Contact() {
                   {copy(lang, { ar: "البلاغ", en: "Report", ur: "رپورٹ" })}
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-relaxed">
-                  {reportTitle(report, t("browseTitle"))}
+                  {reportSummary(report, t("browseTitle"))}
                 </p>
               </div>
             </div>

@@ -179,10 +179,6 @@ export default function Browse() {
             {!loading && !authLoading && !error && (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {rows.map((report) => {
-                  const [maybeTitle, ...rest] = (report.description ?? "").split(" — ");
-                  const title = rest.length ? maybeTitle : null;
-                  const desc = rest.length ? rest.join(" — ") : maybeTitle;
-
                   return (
                     <Link
                       key={report.id}
@@ -206,11 +202,11 @@ export default function Browse() {
                       </div>
 
                       <h3 className="font-display text-xl font-bold mb-2">
-                        {title || report.aiObjectType || t("browseTitle")}
+                        {report.aiObjectType || t("browseTitle")}
                       </h3>
 
                       <p className="text-sm text-muted-foreground mb-6 line-clamp-2 leading-relaxed">
-                        {desc}
+                        {report.description}
                       </p>
 
                       <div className="flex items-center justify-between text-xs text-muted-foreground pt-4 border-t border-border">

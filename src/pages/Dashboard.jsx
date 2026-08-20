@@ -15,9 +15,8 @@ function copy(lang, values) {
   return values[lang] ?? values.en;
 }
 
-function reportTitle(report, fallback) {
-  const [maybeTitle, ...rest] = (report?.description ?? "").split(" — ");
-  return rest.length ? maybeTitle : report?.aiObjectType || fallback;
+function reportSummary(report, fallback) {
+  return report?.description || report?.aiObjectType || fallback;
 }
 
 function formatDate(value, lang) {
@@ -452,7 +451,7 @@ function ActiveReportCard({ report, lang, t }) {
       </div>
 
       <p className="mt-4 line-clamp-2 min-h-10 text-sm font-semibold leading-relaxed sm:text-[15px]">
-        {reportTitle(report, t("browseTitle"))}
+        {reportSummary(report, t("browseTitle"))}
       </p>
 
       <p className="mt-3 text-xs text-muted-foreground">
@@ -480,7 +479,7 @@ function ArchivedReportCard({ report, lang, t }) {
       </div>
 
       <p className="mt-3 truncate text-sm font-semibold text-foreground/75">
-        {reportTitle(report, t("browseTitle"))}
+        {reportSummary(report, t("browseTitle"))}
       </p>
 
       <p className="mt-2 text-xs text-muted-foreground">

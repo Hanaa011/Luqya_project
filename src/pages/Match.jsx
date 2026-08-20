@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
@@ -16,13 +16,14 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  UserX,
   XCircle,
 } from "lucide-react";
 
 import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
 import { deleteReport, getReport, reportImageUrl, updateReport } from "../api/reports";
-import { acceptMatch, listMatches, rejectMatch } from "../api/matches";
+import { acceptMatch, claimMatch, listMatches, rejectMatch } from "../api/matches";
 import { fetchMyReports } from "../lib/myReports";
 import {
   MatchStatus,
@@ -43,11 +44,10 @@ function getMatchScore(match) {
   return Number.isFinite(value) ? Math.round(value) : null;
 }
 
-function splitDescription(report, fallback) {
-  const [maybeTitle, ...rest] = (report?.description ?? "").split(" — ");
+function reportHeading(report, fallback) {
   return {
-    title: rest.length ? maybeTitle : report?.aiObjectType || fallback,
-    description: rest.length ? rest.join(" — ") : maybeTitle,
+    title: report?.aiObjectType || fallback,
+    description: report?.description || null,
   };
 }
 
@@ -83,9 +83,10 @@ function sharedAttributes(a, b) {
 export default function Match() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const fromReportId = searchParams.get("from");
-  const { t, lang } = useI18n();
+  const { t, tr, lang } = useI18n();
   const { profile, userId } = useAuth();
 
   const [report, setReport] = useState(null);
@@ -99,6 +100,20 @@ export default function Match() {
   const [workingAction, setWorkingAction] = useState(null);
   const [actionError, setActionError] = useState(null);
   const matchCandidatesRef = useRef(null);
+
+  // Phase 4 Part 5 (Task B): the claim action, relocated here from
+  // SmartSearch.jsx's result cards. The score is carried forward via
+  // router state from wherever this page was linked from with a real,
+  // observed AI score (SmartSearch.jsx, ReportLost.jsx's own immediate
+  // candidates) - never recomputed or fabricated here, per Phase 4 Part
+  // 3's decision #1 that a claimed match's SimilarityScore is stored
+  // verbatim from what the user actually saw. If this page was reached
+  // without that context (e.g. a direct link, Browse, Dashboard), there
+  // is no honest score to attach a new claim to, so the claim action is
+  // simply not offered in that case - see the Phase 4 Part 5 report.
+  const navScore = location.state?.scorePercentage;
+  const claimableScore = typeof navScore === "number" && Number.isFinite(navScore) ? navScore : null;
+  const [claim, setClaim] = useState(null);
 
   useEffect(() => {
     document.title = "Report details — Luqya";
@@ -127,6 +142,7 @@ export default function Match() {
       setErrorCode(null);
       setMatchCandidates([]);
       setShowMatchCandidates(false);
+      setClaim(null);
     });
 
     const ownershipPromise = userId
@@ -224,7 +240,7 @@ export default function Match() {
   const isReviewingMatch =
     Boolean(match && pairedReport) && !isOwnedReport && ownsPairedReport;
   const isLost = report?.type === ReportType.LOST;
-  const details = useMemo(() => splitDescription(report, t("browseTitle")), [report, t]);
+  const details = useMemo(() => reportHeading(report, t("browseTitle")), [report, t]);
   const score = getMatchScore(match);
 
   const evidence = useMemo(() => {
@@ -312,6 +328,98 @@ export default function Match() {
     } finally {
       setWorkingAction(null);
     }
+  }
+
+  // Phase 4 Part 5 (Task B): relocated, not duplicated, from
+  // SmartSearch.jsx's own startClaim/confirmClaim (Phase 4 Part 3) - same
+  // auth redirect, same fetchMyReports-based eligible-report resolution
+  // and picker, same claimMatch call, same immediate navigation to
+  // Contact on success.
+  async function startClaim(action) {
+    if (!profile) {
+      navigate("/auth/login");
+      return;
+    }
+
+    setClaim({ action, status: "loading" });
+
+    const mine = await fetchMyReports({ userId });
+    if (!mine.reliable) {
+      setClaim({
+        action,
+        status: "error",
+        error: tr({
+          ar: "تعذّر تحميل بلاغاتك. حاول مرة أخرى.",
+          en: "Couldn't load your reports. Please try again.",
+          ur: "آپ کی رپورٹس لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
+        }),
+      });
+      return;
+    }
+
+    const eligible = mine.reports.filter(
+      (r) => r.type !== report.type && r.status !== ReportStatus.CLOSED
+    );
+
+    if (eligible.length === 0) {
+      setClaim({ action, status: "no-eligible" });
+      return;
+    }
+
+    if (eligible.length === 1) {
+      await confirmClaim(action, eligible[0].id);
+      return;
+    }
+
+    setClaim({
+      action,
+      status: "picking",
+      eligible,
+      selectedReportId: eligible[0].id,
+    });
+  }
+
+  async function confirmClaim(action, ownReportId) {
+    setClaim((current) => ({ ...(current ?? {}), action, status: "submitting" }));
+
+    try {
+      await claimMatch({
+        searchResultReportId: report.id,
+        ownReportId,
+        observedScorePercentage: claimableScore,
+        isMine: action === "mine",
+      });
+
+      if (action === "mine") {
+        setClaim({ action, status: "success" });
+        // Decision #2 (Phase 4 Part 3): Contact is immediately reachable -
+        // the pause is purely so the success state is visible, not a gate.
+        window.setTimeout(() => navigate(`/match/${report.id}/contact`), 900);
+      } else {
+        // Task B.2.5: unlike the old inline card (which just removed
+        // itself from the results list), there's no list to remove this
+        // page's own report from - take the user back to a sensible
+        // place instead of leaving them on the report they just dismissed.
+        setClaim({ action, status: "success" });
+        window.setTimeout(() => navigate("/search"), 900);
+      }
+    } catch (err) {
+      setClaim({
+        action,
+        status: "error",
+        error:
+          err.message ||
+          tr({
+            ar: "تعذّر تنفيذ الإجراء. حاول مرة أخرى.",
+            en: "Couldn't complete that action. Please try again.",
+            ur: "یہ عمل مکمل نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+          }),
+      });
+    }
+  }
+
+  function cancelClaim() {
+    setClaim(null);
   }
 
   if (loading) {
@@ -456,7 +564,7 @@ export default function Match() {
                 {matchCandidates.length > 0 ? (
                   <div className="divide-y divide-border">
                     {matchCandidates.map(({ match: candidateMatch, report: candidateReport }) => {
-                      const candidateDetails = splitDescription(candidateReport, t("browseTitle"));
+                      const candidateDetails = reportHeading(candidateReport, t("browseTitle"));
                       const candidateScore = getMatchScore(candidateMatch);
 
                       return (
@@ -697,6 +805,17 @@ export default function Match() {
                         </span>
                         <ArrowRight className={`size-4 ${lang === "ar" || lang === "ur" ? "rotate-180" : ""}`} />
                       </Link>
+                    ) : !isReviewingMatch && claimableScore != null ? (
+                      <ClaimAction
+                        t={t}
+                        tr={tr}
+                        lang={lang}
+                        claim={claim}
+                        onStart={startClaim}
+                        onSelectReport={(reportId) => setClaim((c) => ({ ...c, selectedReportId: reportId }))}
+                        onConfirm={() => confirmClaim(claim.action, claim.selectedReportId)}
+                        onCancel={cancelClaim}
+                      />
                     ) : !profile ? (
                       <Link to="/auth/login" className="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25">
                         {copy(lang, { ar: "سجّل الدخول للتواصل", en: "Log in to contact", ur: "رابطے کے لیے لاگ ان کریں" })}
@@ -771,4 +890,171 @@ function MetaItem({ Icon, label, value }) {
       </div>
     </div>
   );
+}
+
+// Phase 4 Part 5 (Task B.2): the claim entry point, relocated here from
+// SmartSearch.jsx's result cards (Phase 4 Part 3) - presented as the
+// natural next step after reviewing this report's own details, rather
+// than a repeat of the old inline search-result buttons.
+function ClaimAction({ t, tr, claim, onStart, onSelectReport, onConfirm, onCancel }) {
+  const busy = claim && !["error", "no-eligible", "picking"].includes(claim.status);
+
+  return (
+    <div>
+      <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+        {tr({
+          ar: "اتخذ الإجراء المناسب بعد مراجعة تفاصيل هذا البلاغ.",
+          en: "Take the appropriate action after reviewing this report's details.",
+          ur: "اس رپورٹ کی تفصیلات دیکھنے کے بعد مناسب کارروائی اختیار کریں۔",
+        })}
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onStart("mine")}
+          disabled={busy}
+          className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-success-tint px-3 text-sm font-bold text-success transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90 hover:shadow-sm disabled:pointer-events-none disabled:opacity-50"
+        >
+          <Check className="size-4" />
+          {t("claimMineCta")}
+        </button>
+        <button
+          type="button"
+          onClick={() => onStart("not-mine")}
+          disabled={busy}
+          className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border px-3 text-sm font-bold text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:bg-stone-100 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+        >
+          <UserX className="size-4" />
+          {t("claimNotMineCta")}
+        </button>
+      </div>
+
+      {claim && (
+        <ClaimPanel claim={claim} tr={tr} onSelectReport={onSelectReport} onConfirm={onConfirm} onCancel={onCancel} />
+      )}
+    </div>
+  );
+}
+
+// Phase 4 Part 5: relocated, not duplicated, from SmartSearch.jsx's own
+// ClaimPanel (Phase 4 Part 3) - covers every state startClaim/confirmClaim
+// can produce, adapted to this page's sidebar layout instead of an inline
+// card footer.
+function ClaimPanel({ claim, tr, onSelectReport, onConfirm, onCancel }) {
+  const isMine = claim.action === "mine";
+
+  if (claim.status === "loading") {
+    return (
+      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="size-3.5 animate-spin" />
+        {tr({ ar: "جارٍ التحقق من بلاغاتك…", en: "Checking your reports…", ur: "آپ کی رپورٹس چیک ہو رہی ہیں…" })}
+      </div>
+    );
+  }
+
+  if (claim.status === "no-eligible") {
+    return (
+      <div className="mt-3">
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {tr({
+            ar: "لا يوجد لديك بلاغ مفتوح من النوع المقابل لربط هذا الإجراء به.",
+            en: "You don't have an open report of the matching type to link this to.",
+            ur: "اس عمل کو منسلک کرنے کے لیے آپ کے پاس مناسب قسم کی کوئی کھلی رپورٹ نہیں ہے۔",
+          })}{" "}
+          <Link to="/report" className="font-semibold text-primary hover:underline">
+            {tr({ ar: "أنشئ بلاغًا", en: "Create one", ur: "ایک بنائیں" })}
+          </Link>
+        </p>
+        <button type="button" onClick={onCancel} className="mt-2 text-xs font-semibold text-muted-foreground hover:text-foreground">
+          {tr({ ar: "إغلاق", en: "Dismiss", ur: "برخاست کریں" })}
+        </button>
+      </div>
+    );
+  }
+
+  if (claim.status === "picking") {
+    return (
+      <div className="mt-3 border-t border-border pt-4">
+        <p className="mb-2 text-xs font-semibold">
+          {tr({
+            ar: "أي من بلاغاتك يتعلق بهذا؟",
+            en: "Which of your reports is this?",
+            ur: "یہ آپ کی کون سی رپورٹ سے متعلق ہے؟",
+          })}
+        </p>
+        <div className="mb-3 space-y-1.5">
+          {claim.eligible.map((eligibleReport) => (
+            <label key={eligibleReport.id} className="flex items-center gap-2 text-xs cursor-pointer">
+              <input
+                type="radio"
+                name="claim-report"
+                checked={claim.selectedReportId === eligibleReport.id}
+                onChange={() => onSelectReport(eligibleReport.id)}
+              />
+              <span className="truncate">
+                {eligibleReport.description || eligibleReport.aiObjectType || eligibleReport.id}
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="flex-1 rounded-xl bg-primary text-primary-foreground text-xs font-bold py-2"
+          >
+            {tr({ ar: "تأكيد", en: "Confirm", ur: "تصدیق کریں" })}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-xl border border-border text-xs font-semibold px-3 py-2"
+          >
+            {tr({ ar: "إلغاء", en: "Cancel", ur: "منسوخ کریں" })}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (claim.status === "submitting") {
+    return (
+      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="size-3.5 animate-spin" />
+        {tr({ ar: "جارٍ التنفيذ…", en: "Submitting…", ur: "جمع ہو رہا ہے…" })}
+      </div>
+    );
+  }
+
+  if (claim.status === "success") {
+    return (
+      <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-success">
+        <Check className="size-3.5" />
+        {isMine
+          ? tr({
+              ar: "تم! جارٍ نقلك إلى صفحة التواصل…",
+              en: "Confirmed! Taking you to the contact page…",
+              ur: "تصدیق ہو گئی! رابطہ صفحہ کی طرف لے جایا جا رہا ہے…",
+            })
+          : tr({
+              ar: "تم الحفظ. جارٍ إعادتك إلى نتائج البحث…",
+              en: "Got it. Taking you back to search…",
+              ur: "محفوظ ہو گیا۔ آپ کو تلاش کی طرف واپس لے جایا جا رہا ہے…",
+            })}
+      </div>
+    );
+  }
+
+  if (claim.status === "error") {
+    return (
+      <div className="mt-3">
+        <p className="mb-1.5 text-xs text-error">{claim.error}</p>
+        <button type="button" onClick={onCancel} className="text-xs font-semibold text-muted-foreground hover:text-foreground">
+          {tr({ ar: "إغلاق", en: "Dismiss", ur: "برخاست کریں" })}
+        </button>
+      </div>
+    );
+  }
+
+  return null;
 }

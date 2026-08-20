@@ -56,7 +56,6 @@ export default function ReportFound() {
   const { profile } = useAuth();
 
   const [phase, setPhase] = useState("form"); // form | saving | thanks
-  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [locationText, setLocationText] = useState("");
   const [lostFoundDate, setLostFoundDate] = useState("");
@@ -179,7 +178,7 @@ export default function ReportFound() {
         locationId,
         locationDetails: locationText,
         type: ReportType.FOUND,
-        description: `${title ? title + " — " : ""}${description}`,
+        description,
         lostFoundDate: lostFoundDate ? new Date(lostFoundDate).toISOString() : undefined,
         imagePath,
         isItemWithFinder: true,
@@ -275,17 +274,6 @@ export default function ReportFound() {
               <div className="absolute -top-20 -end-20 size-64 rounded-full bg-accent/10 blur-3xl" />
 
               <div className="relative space-y-8">
-                <Field label={t("fldTitle")}>
-                  <input
-                    type="text"
-                    required
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder={t("fldTitlePh")}
-                    className="w-full px-5 py-4 rounded-2xl bg-stone-50 border border-stone-200 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15 transition-all"
-                  />
-                </Field>
-
                 <Field label={t("fldDesc")}>
                   <textarea
                     required

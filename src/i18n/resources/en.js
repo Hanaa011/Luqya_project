@@ -159,7 +159,6 @@ export default {
   reportSub: "Share the details — the AI will search on your behalf.",
   lost: "Lost",
   found: "Found",
-  fldTitle: "Short title",
   fldDesc: "Detailed description",
   fldDescPh: "e.g. brown leather wallet with a bank card and a small key inside...",
   fldCategory: "Category",
@@ -179,7 +178,6 @@ export default {
   searchImageReplaceCta: "Replace image",
   searchingByImageLabel: "Analyzing image…",
 
-  fldTitlePh: "Brown leather wallet",
   fldLocationPh: "King Khalid Airport",
 
   // Browse

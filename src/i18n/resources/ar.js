@@ -157,7 +157,6 @@ export default {
   reportSub: "املأ التفاصيل وسيتولى الذكاء الاصطناعي البحث نيابةً عنك.",
   lost: "مفقود",
   found: "عُثر عليه",
-  fldTitle: "عنوان مختصر",
   fldDesc: "وصف تفصيلي",
   fldDescPh: "مثال: محفظة جلد بنية داخلها بطاقة بنكية ومفتاح صغير...",
   fldCategory: "الفئة",
@@ -177,7 +176,6 @@ export default {
   submitReport: "إرسال البلاغ",
   voiceInputLabel: "إدخال صوتي",
 
-  fldTitlePh: "محفظة جلدية بنية",
   fldLocationPh: "مطار الملك خالد",
 
   // Browse

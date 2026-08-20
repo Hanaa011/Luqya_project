@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Search, Loader2, AlertCircle, MapPin, Sparkles, RotateCcw, X, ImagePlus, Check, UserX } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Search, Loader2, AlertCircle, MapPin, Sparkles, RotateCcw, X, ImagePlus } from "lucide-react";
 
 import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
 import DammaMark from "../components/DammaMark";
 import { aiSearch, imageFileToBase64 } from "../api/search";
 import { reportImageUrl } from "../api/reports";
-import { claimMatch, listMatches } from "../api/matches";
-import { ReportType, ReportStatus, MatchStatus } from "../api/enums";
+import { listMatches } from "../api/matches";
+import { ReportType, MatchStatus } from "../api/enums";
 import { fetchMyReports } from "../lib/myReports";
 import { validateImageFile, ImageValidationReason } from "../lib/imageValidation";
 
@@ -50,8 +50,7 @@ const TYPE_FILTERS = [
 
 export default function SmartSearch() {
   const { t, tr } = useI18n();
-  const navigate = useNavigate();
-  const { profile, userId } = useAuth();
+  const { userId } = useAuth();
   const [text, setText] = useState("");
   const [typeFilter, setTypeFilter] = useState("found");
   const [status, setStatus] = useState("idle"); // idle | loading | success | empty | error
@@ -62,13 +61,6 @@ export default function SmartSearch() {
   // filter (Phase 4 Part 3) — see runSearch and the "empty" state render
   // below for why this needs its own counter, not just a shared one.
   const [dismissedExcluded, setDismissedExcluded] = useState(0);
-
-  // Phase 4 Part 3: "This is my item" / "Not my item" claim flow state for
-  // whichever single result card currently has it open. Shape:
-  // { reportId, resultType, observedScorePercentage, action: "mine"|"not-mine",
-  //   status: "loading"|"no-eligible"|"picking"|"submitting"|"success"|"error",
-  //   eligible?: Report[], selectedReportId?: string, error?: string }
-  const [claim, setClaim] = useState(null);
 
   // Task 2 (Phase 3 Part 3): whether the search that produced the current
   // "empty" state had an image and no text. Live-diagnosed root cause: a
@@ -142,7 +134,6 @@ export default function SmartSearch() {
     setOwnReportsExcluded(0);
     setDismissedExcluded(0);
     setLastSearchWasImageOnly(Boolean(imageFile) && !text.trim());
-    setClaim(null);
 
     try {
       // Verified request contract (AiSearchInputDto): Text and ImageBase64
@@ -222,102 +213,6 @@ export default function SmartSearch() {
       setStatus("error");
       setErrorMsg(err.message || t("searchErrorGeneric"));
     }
-  }
-
-  // Phase 4 Part 3 (Task B) — entry point for both "This is my item" and
-  // "Not my item", started directly from a result card on this page
-  // (decision #4: the claim action lives on /search, not only on a
-  // specific report's own page).
-  async function startClaim(result, action) {
-    if (!profile) {
-      navigate("/auth/login");
-      return;
-    }
-
-    setClaim({ reportId: result.reportId, resultType: result.type, observedScorePercentage: result.scorePercentage, action, status: "loading" });
-
-    const mine = await fetchMyReports({ userId });
-    if (!mine.reliable) {
-      setClaim({
-        reportId: result.reportId,
-        action,
-        status: "error",
-        error: tr({
-          ar: "تعذّر تحميل بلاغاتك. حاول مرة أخرى.",
-          en: "Couldn't load your reports. Please try again.",
-          ur: "آپ کی رپورٹس لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
-        }),
-      });
-      return;
-    }
-
-    // Task B.3: opposite type (a Found result can only be claimed against
-    // a Lost report of the user's own, and vice versa) and "still open/
-    // unresolved" — Closed reports are done, not a fit for a new claim.
-    const eligible = mine.reports.filter(
-      (r) => r.type !== result.type && r.status !== ReportStatus.CLOSED
-    );
-
-    if (eligible.length === 0) {
-      setClaim({ reportId: result.reportId, action, status: "no-eligible" });
-      return;
-    }
-
-    if (eligible.length === 1) {
-      await confirmClaim(result, action, eligible[0].id);
-      return;
-    }
-
-    setClaim({
-      reportId: result.reportId,
-      action,
-      status: "picking",
-      eligible,
-      selectedReportId: eligible[0].id,
-    });
-  }
-
-  async function confirmClaim(result, action, ownReportId) {
-    setClaim((current) => ({ ...(current ?? {}), reportId: result.reportId, action, status: "submitting" }));
-
-    try {
-      await claimMatch({
-        searchResultReportId: result.reportId,
-        ownReportId,
-        observedScorePercentage: result.scorePercentage,
-        isMine: action === "mine",
-      });
-
-      if (action === "mine") {
-        setClaim({ reportId: result.reportId, action, status: "success" });
-        // Decision #2: Contact is immediately reachable — no waiting on
-        // the other party. A short pause here is purely so the success
-        // state is visible before navigating away, not a gate of any kind.
-        window.setTimeout(() => navigate(`/match/${result.reportId}/contact`), 900);
-      } else {
-        // Task B.6: low-friction — the dismissed result simply leaves the
-        // current view immediately, no further confirmation needed.
-        setResults((prev) => prev.filter((r) => r.reportId !== result.reportId));
-        setClaim(null);
-      }
-    } catch (err) {
-      setClaim({
-        reportId: result.reportId,
-        action,
-        status: "error",
-        error:
-          err.message ||
-          tr({
-            ar: "تعذّر تنفيذ الإجراء. حاول مرة أخرى.",
-            en: "Couldn't complete that action. Please try again.",
-            ur: "یہ عمل مکمل نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
-          }),
-      });
-    }
-  }
-
-  function cancelClaim() {
-    setClaim(null);
   }
 
   return (
@@ -496,7 +391,11 @@ export default function SmartSearch() {
                     key={r.reportId}
                     className="group rounded-[1.75rem] border border-border bg-card overflow-hidden shadow-soft hover:shadow-luxe transition-all"
                   >
-                    <Link to={`/match/${r.reportId}`} className="block hover:-translate-y-1 transition-transform">
+                    <Link
+                      to={`/match/${r.reportId}`}
+                      state={{ scorePercentage: r.scorePercentage }}
+                      className="block hover:-translate-y-1 transition-transform"
+                    >
                       <div className="aspect-[16/10] bg-gradient-to-br from-stone-100 to-stone-200 relative grid place-items-center overflow-hidden">
                         {r.imagePath ? (
                           <img
@@ -513,7 +412,7 @@ export default function SmartSearch() {
                           </span>
                         )}
                       </div>
-                      <div className="p-5 pb-0">
+                      <div className="p-5">
                         <h3 className="font-bold mb-2 group-hover:text-primary transition-colors line-clamp-2">
                           {r.description || r.aiObjectType}
                         </h3>
@@ -525,42 +424,6 @@ export default function SmartSearch() {
                         )}
                       </div>
                     </Link>
-
-                    {/* Phase 4 Part 3: claim entry point, directly on the
-                        search result card (decision #4) — deliberately
-                        outside the Link above (stopPropagation isn't
-                        needed since these buttons aren't nested inside an
-                        anchor at all). */}
-                    <div className="p-5 pt-3 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startClaim(r, "mine")}
-                        disabled={claim?.reportId === r.reportId && claim.status !== "error" && claim.status !== "no-eligible" && claim.status !== "picking"}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-success-tint text-success text-xs font-bold px-3 py-2.5 hover:opacity-80 transition-opacity disabled:opacity-50"
-                      >
-                        <Check className="size-3.5" />
-                        {t("claimMineCta")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => startClaim(r, "not-mine")}
-                        disabled={claim?.reportId === r.reportId && claim.status !== "error" && claim.status !== "no-eligible" && claim.status !== "picking"}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-border text-muted-foreground text-xs font-bold px-3 py-2.5 hover:bg-stone-100 transition-colors disabled:opacity-50"
-                      >
-                        <UserX className="size-3.5" />
-                        {t("claimNotMineCta")}
-                      </button>
-                    </div>
-
-                    {claim?.reportId === r.reportId && (
-                      <ClaimPanel
-                        claim={claim}
-                        tr={tr}
-                        onSelectReport={(id) => setClaim((c) => ({ ...c, selectedReportId: id }))}
-                        onConfirm={() => confirmClaim(r, claim.action, claim.selectedReportId)}
-                        onCancel={cancelClaim}
-                      />
-                    )}
                   </div>
                 ))}
               </div>
@@ -570,121 +433,4 @@ export default function SmartSearch() {
       </div>
     </section>
   );
-}
-
-// Phase 4 Part 3 (Task B.3/B.4): the inline panel shown under a result
-// card while a claim is in progress — covers every state startClaim/
-// confirmClaim can produce: loading the user's own reports, no eligible
-// report to claim against, picking one when there's more than one, an
-// in-flight submit, a brief success state (before navigating to Contact),
-// and a retryable error.
-function ClaimPanel({ claim, tr, onSelectReport, onConfirm, onCancel }) {
-  const isMine = claim.action === "mine";
-
-  if (claim.status === "loading") {
-    return (
-      <div className="px-5 pb-5 flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" />
-        {tr({ ar: "جارٍ التحقق من بلاغاتك…", en: "Checking your reports…", ur: "آپ کی رپورٹس چیک ہو رہی ہیں…" })}
-      </div>
-    );
-  }
-
-  if (claim.status === "no-eligible") {
-    return (
-      <div className="px-5 pb-5">
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          {tr({
-            ar: "لا يوجد لديك بلاغ مفتوح من النوع المقابل لربط هذا الإجراء به.",
-            en: "You don't have an open report of the matching type to link this to.",
-            ur: "اس عمل کو منسلک کرنے کے لیے آپ کے پاس مناسب قسم کی کوئی کھلی رپورٹ نہیں ہے۔",
-          })}{" "}
-          <Link to="/report" className="font-semibold text-primary hover:underline">
-            {tr({ ar: "أنشئ بلاغًا", en: "Create one", ur: "ایک بنائیں" })}
-          </Link>
-        </p>
-        <button type="button" onClick={onCancel} className="mt-2 text-xs font-semibold text-muted-foreground hover:text-foreground">
-          {tr({ ar: "إغلاق", en: "Dismiss", ur: "برخاست کریں" })}
-        </button>
-      </div>
-    );
-  }
-
-  if (claim.status === "picking") {
-    return (
-      <div className="px-5 pb-5 border-t border-border pt-4 mt-1">
-        <p className="text-xs font-semibold mb-2">
-          {tr({
-            ar: "أي من بلاغاتك يتعلق بهذا؟",
-            en: "Which of your reports is this?",
-            ur: "یہ آپ کی کون سی رپورٹ سے متعلق ہے؟",
-          })}
-        </p>
-        <div className="space-y-1.5 mb-3">
-          {claim.eligible.map((report) => (
-            <label key={report.id} className="flex items-center gap-2 text-xs cursor-pointer">
-              <input
-                type="radio"
-                name={`claim-report-${claim.reportId}`}
-                checked={claim.selectedReportId === report.id}
-                onChange={() => onSelectReport(report.id)}
-              />
-              <span className="truncate">{report.description || report.aiObjectType || report.id}</span>
-            </label>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="flex-1 rounded-xl bg-primary text-primary-foreground text-xs font-bold py-2"
-          >
-            {tr({ ar: "تأكيد", en: "Confirm", ur: "تصدیق کریں" })}
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-xl border border-border text-xs font-semibold px-3 py-2"
-          >
-            {tr({ ar: "إلغاء", en: "Cancel", ur: "منسوخ کریں" })}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (claim.status === "submitting") {
-    return (
-      <div className="px-5 pb-5 flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" />
-        {tr({ ar: "جارٍ التنفيذ…", en: "Submitting…", ur: "جمع ہو رہا ہے…" })}
-      </div>
-    );
-  }
-
-  if (claim.status === "success" && isMine) {
-    return (
-      <div className="px-5 pb-5 flex items-center gap-2 text-xs font-semibold text-success">
-        <Check className="size-3.5" />
-        {tr({
-          ar: "تم! جارٍ نقلك إلى صفحة التواصل…",
-          en: "Confirmed! Taking you to the contact page…",
-          ur: "تصدیق ہو گئی! رابطہ صفحہ کی طرف لے جایا جا رہا ہے…",
-        })}
-      </div>
-    );
-  }
-
-  if (claim.status === "error") {
-    return (
-      <div className="px-5 pb-5">
-        <p className="text-xs text-error mb-1.5">{claim.error}</p>
-        <button type="button" onClick={onCancel} className="text-xs font-semibold text-muted-foreground hover:text-foreground">
-          {tr({ ar: "إغلاق", en: "Dismiss", ur: "برخاست کریں" })}
-        </button>
-      </div>
-    );
-  }
-
-  return null;
 }

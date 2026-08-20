@@ -157,7 +157,6 @@ export default {
   reportSub: "تفصیلات فراہم کریں — اے آئی آپ کی جانب سے تلاش کرے گا۔",
   lost: "گمشدہ",
   found: "ملی ہوئی",
-  fldTitle: "مختصر عنوان",
   fldDesc: "تفصیلی وضاحت",
   fldDescPh: "مثال: بھورا چمڑے کا بٹوہ جس میں بینک کارڈ اور ایک چھوٹی چابی ہے...",
   fldCategory: "زمرہ",
@@ -177,7 +176,6 @@ export default {
   submitReport: "رپورٹ جمع کروائیں",
   voiceInputLabel: "صوتی ان پٹ",
 
-  fldTitlePh: "بھورا چمڑے کا بٹوہ",
   fldLocationPh: "شاہ خالد ہوائی اڈہ",
 
   // Browse
