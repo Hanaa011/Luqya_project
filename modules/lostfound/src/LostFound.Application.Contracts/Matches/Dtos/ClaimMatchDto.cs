@@ -12,8 +12,14 @@ namespace LostFound.Matches.Dtos
         public Guid SearchResultReportId { get; set; }
 
         // The caller's own report this claim relates to - the caller must
-        // own this report; enforced server-side, not trusted from the client.
-        public Guid OwnReportId { get; set; }
+        // own this report; enforced server-side, not trusted from the
+        // client. Phase 4 Part 6 (Task B): now nullable - null means the
+        // caller has no eligible report of their own. In that case
+        // IsMine must be true (dismissing a result still requires a real
+        // own report to scope the dismissal to); the server records a
+        // narrower ReportClaim instead of a full Match - see
+        // MatchAppService.ClaimAsync.
+        public Guid? OwnReportId { get; set; }
 
         // The exact ScorePercentage the user was shown for this result at
         // claim time (decision #1) - stored verbatim on a newly-created

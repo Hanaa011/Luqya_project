@@ -20,5 +20,6 @@ namespace LostFound.EntityFrameworkCore
         DbSet<Report> Reports { get; }
         DbSet<Notification> Notifications { get; }
         DbSet<Match> Matches { get; }
+        DbSet<ReportClaim> ReportClaims { get; }
     }
 }

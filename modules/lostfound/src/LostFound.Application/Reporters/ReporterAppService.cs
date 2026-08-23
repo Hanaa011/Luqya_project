@@ -27,17 +27,20 @@ namespace LostFound.Reporters
         private readonly IReporterRepository _reporterRepository;
         private readonly IReportRepository _reportRepository;
         private readonly IMatchRepository _matchRepository;
+        private readonly IReportClaimRepository _reportClaimRepository;
         private readonly ReporterManager _reporterManager;
 
         public ReporterAppService(
             IReporterRepository reporterRepository,
             IReportRepository reportRepository,
             IMatchRepository matchRepository,
+            IReportClaimRepository reportClaimRepository,
             ReporterManager reporterManager)
         {
             _reporterRepository = reporterRepository;
             _reportRepository = reportRepository;
             _matchRepository = matchRepository;
+            _reportClaimRepository = reportClaimRepository;
             _reporterManager = reporterManager;
         }
 
@@ -72,7 +75,15 @@ namespace LostFound.Reporters
         // Every report id created by a reporter the current user is
         // entitled to contact: any report the user owns (CreatorId) that
         // has an existing Match (either side, any status) to a report
-        // authored by that reporter.
+        // authored by that reporter - PLUS (Phase 4 Part 6, Task B) any
+        // report the current user has directly claimed ("this is my item"
+        // with no eligible own report of their own - LostFound.Domain.Matches.ReportClaim).
+        // Both are the same kind of fact ("this authenticated user has a
+        // confirmed, specific reason to contact this reporter") - a
+        // ReportClaim just doesn't require a second, paired report to
+        // record it. This is additive only: it never removes a Match-based
+        // grant, and a report nobody has claimed or matched against still
+        // grants nothing.
         private async Task<IQueryable<Guid>> GetRelatedReporterIdsQueryableAsync()
         {
             if (!CurrentUser.IsAuthenticated || CurrentUser.Id == null)
@@ -82,6 +93,7 @@ namespace LostFound.Reporters
 
             var reportQueryable = await _reportRepository.GetQueryableAsync();
             var matchQueryable = await _matchRepository.GetQueryableAsync();
+            var claimQueryable = await _reportClaimRepository.GetQueryableAsync();
 
             var myReportIds = reportQueryable
                 .Where(r => r.CreatorId == CurrentUser.Id)
@@ -91,8 +103,14 @@ namespace LostFound.Reporters
                 .Where(m => myReportIds.Contains(m.LostReportId) || myReportIds.Contains(m.FoundReportId))
                 .Select(m => myReportIds.Contains(m.LostReportId) ? m.FoundReportId : m.LostReportId);
 
+            var directlyClaimedReportIds = claimQueryable
+                .Where(c => c.ClaimantUserId == CurrentUser.Id)
+                .Select(c => c.ReportId);
+
+            var accessibleReportIds = relatedOtherReportIds.Concat(directlyClaimedReportIds);
+
             return reportQueryable
-                .Where(r => relatedOtherReportIds.Contains(r.Id))
+                .Where(r => accessibleReportIds.Contains(r.Id))
                 .Select(r => r.ReporterId)
                 .Distinct();
         }

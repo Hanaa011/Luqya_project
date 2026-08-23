@@ -13,6 +13,7 @@ namespace LostFound.Matches
     public class MatchManager : DomainService
     {
         private readonly IMatchRepository _matchRepository;
+        private readonly IReportClaimRepository _reportClaimRepository;
         private readonly IReportRepository _reportRepository;
         private readonly INotificationRepository _notificationRepository;
         private readonly IMatchRankingService _matchRankingService;
@@ -20,12 +21,14 @@ namespace LostFound.Matches
 
         public MatchManager(
             IMatchRepository matchRepository,
+            IReportClaimRepository reportClaimRepository,
             IReportRepository reportRepository,
             INotificationRepository notificationRepository,
             IMatchRankingService matchRankingService,
             ILogger<MatchManager> logger)
         {
             _matchRepository = matchRepository;
+            _reportClaimRepository = reportClaimRepository;
             _reportRepository = reportRepository;
             _notificationRepository = notificationRepository;
             _matchRankingService = matchRankingService;
@@ -229,6 +232,48 @@ namespace LostFound.Matches
             await _matchRepository.InsertAsync(match, autoSave: true);
 
             return match;
+        }
+
+        // Phase 4 Part 6 (Task B): "this is my item" for a caller with no
+        // eligible own report to pair into a full Match (Match requires
+        // both a LostReportId and a FoundReportId - there is no second
+        // report here). Grants the same immediate contact access a real
+        // claim would (see ReporterAppService.GetRelatedReporterIdsQueryableAsync,
+        // which this record extends), scoped to exactly this
+        // (claimant, report) pair - never a general loosening of the
+        // Phase 4 Part 2 contact rule, and never visible in any "both
+        // parties" Dashboard view, since there is no second report to
+        // show it on. Idempotent: re-confirming does not insert a second
+        // row or a second notification.
+        public async Task<ReportClaim> GetOrCreateClaimWithoutOwnReportAsync(
+            Guid reportId, Guid claimantUserId, double observedScorePercentage)
+        {
+            var claimedReport = await _reportRepository.GetAsync(reportId);
+
+            var existing = await _reportClaimRepository.FindAsync(reportId, claimantUserId);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var claim = new ReportClaim(GuidGenerator.Create(), reportId, claimantUserId, (decimal)observedScorePercentage);
+            await _reportClaimRepository.InsertAsync(claim, autoSave: true);
+
+            // There's no second, paired report here to notify "both
+            // parties" the way NotifyBothReportersAsync does for a real
+            // Match - but the claimed report's own reporter can still be
+            // told, honestly, that someone claims this is theirs.
+            await _notificationRepository.InsertAsync(
+                new Notification(
+                    GuidGenerator.Create(),
+                    claimedReport.ReporterId,
+                    claimedReport.Id,
+                    "Someone claimed your item",
+                    "A user confirmed this report matches something they lost or found and can now see your contact details."
+                )
+            );
+
+            return claim;
         }
 
         public async Task NotifyMatchDecisionAsync(Match match, bool accepted)

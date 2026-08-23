@@ -20,6 +20,7 @@ namespace LostFound.EntityFrameworkCore
         public DbSet<Report> Reports { get; set; } = null!;
         public DbSet<Notification> Notifications { get; set; } = null!;
         public DbSet<Match> Matches { get; set; } = null!;
+        public DbSet<ReportClaim> ReportClaims { get; set; } = null!;
 
         public LostFoundDbContext(DbContextOptions<LostFoundDbContext> options) : base(options)
         {

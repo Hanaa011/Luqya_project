@@ -27,7 +27,10 @@ namespace LostFound.Matches
         // Phase 4 Part 3: the user-initiated counterpart to the above two -
         // claims (or dismisses) one specific Smart-Search result against
         // one of the caller's own reports. Unlike RecomputeMatchesAsync,
-        // this never scores or touches any other candidate.
-        Task<MatchDto> ClaimAsync(ClaimMatchDto input);
+        // this never scores or touches any other candidate. Phase 4 Part 6
+        // (Task B): ClaimMatchDto.OwnReportId is now optional - see
+        // ClaimResultDto and ClaimMatchDto for what changes when it's
+        // absent.
+        Task<ClaimResultDto> ClaimAsync(ClaimMatchDto input);
     }
 }

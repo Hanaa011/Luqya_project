@@ -3,6 +3,7 @@ using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Authorization;
@@ -85,21 +86,47 @@ namespace LostFound.Matches
         // MatchManager.GetOrCreateMatchForClaimAsync itself stays a plain
         // domain service with no auth concerns, consistent with the rest of
         // this class's methods.
-        public async Task<MatchDto> ClaimAsync(ClaimMatchDto input)
+        //
+        // Phase 4 Part 6 (Task B): OwnReportId is now optional. When the
+        // caller genuinely owns no eligible report, confirming "this is my
+        // item" no longer requires creating one first - see the null
+        // branch below, which records a narrower ReportClaim instead of a
+        // full, two-sided Match and still grants immediate contact access.
+        public async Task<ClaimResultDto> ClaimAsync(ClaimMatchDto input)
         {
             if (!CurrentUser.IsAuthenticated || CurrentUser.Id == null)
             {
                 throw new AbpAuthorizationException("You must be signed in to claim a search result.");
             }
 
-            var ownReport = await _reportRepository.GetAsync(input.OwnReportId);
+            if (!input.OwnReportId.HasValue)
+            {
+                // "Not my item" with no own report has nothing to scope the
+                // dismissal to (the search-time exclusion filter - Phase 4
+                // Part 3/4 - works by cross-referencing the caller's own
+                // reports' rejected matches) - the frontend's own picker
+                // already never reaches this endpoint in that case; this is
+                // a defensive guard, not a real path.
+                if (!input.IsMine)
+                {
+                    throw new UserFriendlyException(
+                        "Dismissing a search result requires one of your own reports to link the dismissal to.");
+                }
+
+                await _matchManager.GetOrCreateClaimWithoutOwnReportAsync(
+                    input.SearchResultReportId, CurrentUser.Id.Value, input.ObservedScorePercentage);
+
+                return new ClaimResultDto { Match = null, ContactAccessGranted = true };
+            }
+
+            var ownReport = await _reportRepository.GetAsync(input.OwnReportId.Value);
             if (ownReport.CreatorId != CurrentUser.Id)
             {
                 throw new AbpAuthorizationException("You can only claim a search result against a report you own.");
             }
 
             var match = await _matchManager.GetOrCreateMatchForClaimAsync(
-                input.SearchResultReportId, input.OwnReportId, input.ObservedScorePercentage);
+                input.SearchResultReportId, input.OwnReportId.Value, input.ObservedScorePercentage);
 
             if (input.IsMine)
             {
@@ -109,7 +136,8 @@ namespace LostFound.Matches
                 // the other party - AcceptAsync already behaves this way
                 // today (Match.jsx's Contact link never checks match.status),
                 // so no adjustment to Accept's own semantics was needed.
-                return await AcceptAsync(match.Id);
+                var accepted = await AcceptAsync(match.Id);
+                return new ClaimResultDto { Match = accepted, ContactAccessGranted = true };
             }
 
             // "Not my item": persisted as MatchStatus.Rejected on the same
@@ -124,7 +152,7 @@ namespace LostFound.Matches
             // about an interaction they were never part of.
             match.Reject();
             await _matchRepository.UpdateAsync(match);
-            return MapToDto(match);
+            return new ClaimResultDto { Match = MapToDto(match), ContactAccessGranted = false };
         }
 
         private static MatchDto MapToDto(Match match)

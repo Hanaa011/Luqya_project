@@ -20,6 +20,7 @@ namespace LostFound.EntityFrameworkCore
             builder.ConfigureReport();
             builder.ConfigureNotification();
             builder.ConfigureMatch();
+            builder.ConfigureReportClaim();
         }
     }
 }
