@@ -17,13 +17,16 @@ import { getReport } from "../api/reports";
 import { getReporter } from "../api/reporters";
 import { PreferredContactType, ReportType, preferredContactLabelKey } from "../api/enums";
 import { ApiError } from "../api/httpClient";
+import { reportHeadingTitle } from "../lib/reportTitle";
 
 function copy(lang, values) {
   return values[lang] ?? values.en;
 }
 
+// Phase 4 Part 6 (Task C): a short, extracted heading, not the full
+// description - matches every other page's report heading now.
 function reportSummary(report, fallback) {
-  return report?.description || report?.aiObjectType || fallback;
+  return reportHeadingTitle(report, fallback);
 }
 
 export default function Contact() {

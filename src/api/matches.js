@@ -16,12 +16,16 @@ export function rejectMatch(id) {
 }
 
 // Phase 4 Part 3: IMatchAppService.ClaimAsync(ClaimMatchDto) -> POST
-// api/app/match/claim -> MatchDto. The "this is my item"/"not my item"
-// action from a Smart Search result — searchResultReportId is the result
-// being claimed, ownReportId is whichever of the caller's own reports it
-// relates to, observedScorePercentage is the exact score already shown
-// for that result card (never recomputed client- or server-side).
-export function claimMatch({ searchResultReportId, ownReportId, observedScorePercentage, isMine }) {
+// api/app/match/claim -> ClaimResultDto. The "this is my item"/"not my
+// item" action from a report's detail page — searchResultReportId is the
+// result being claimed, ownReportId is whichever of the caller's own
+// reports it relates to, observedScorePercentage is the exact score
+// already shown for that result (never recomputed client- or
+// server-side). Phase 4 Part 6 (Task B): ownReportId may be omitted
+// (sent as null) when the caller has no eligible report of their own —
+// only valid with isMine: true; the backend then grants contact access
+// via a narrower per-report claim instead of a full two-sided Match.
+export function claimMatch({ searchResultReportId, ownReportId = null, observedScorePercentage, isMine }) {
   return api.post("/api/app/match/claim", {
     searchResultReportId,
     ownReportId,

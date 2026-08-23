@@ -22,6 +22,7 @@ import GuestContactFields from "../components/GuestContactFields";
 import { createReport, reportImageUrl, uploadReportImage } from "../api/reports";
 import { listLocations, createLocation } from "../api/locations";
 import { aiSearch, imageFileToBase64 } from "../api/search";
+import { reportHeadingTitle } from "../lib/reportTitle";
 import { ReportType, PreferredContactType } from "../api/enums";
 import { ApiError } from "../api/httpClient";
 import { isValidSaudiMobile } from "../lib/saudiPhone";
@@ -657,7 +658,7 @@ function MatchesView({ t, matches }) {
             </div>
             <div className="p-5">
               <h3 className="font-bold mb-2 group-hover:text-primary transition-colors">
-                {m.description}
+                {reportHeadingTitle(m, t("browseTitle"))}
               </h3>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 {m.aiObjectType && (

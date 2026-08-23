@@ -25,6 +25,7 @@ import { useAuth } from "../lib/useAuth";
 import { deleteReport, getReport, reportImageUrl, updateReport } from "../api/reports";
 import { acceptMatch, claimMatch, listMatches, rejectMatch } from "../api/matches";
 import { fetchMyReports } from "../lib/myReports";
+import { reportHeadingTitle } from "../lib/reportTitle";
 import {
   MatchStatus,
   ReportStatus,
@@ -44,9 +45,13 @@ function getMatchScore(match) {
   return Number.isFinite(value) ? Math.round(value) : null;
 }
 
+// Phase 4 Part 6 (Task C): heading now prefers a short, extracted
+// portion of the description (reportHeadingTitle) over the generic
+// AI-classified object type - aiObjectType is only the final fallback,
+// used when the description is empty/whitespace.
 function reportHeading(report, fallback) {
   return {
-    title: report?.aiObjectType || fallback,
+    title: reportHeadingTitle(report, fallback),
     description: report?.description || null,
   };
 }
@@ -337,7 +342,13 @@ export default function Match() {
   // Contact on success.
   async function startClaim(action) {
     if (!profile) {
-      navigate("/auth/login");
+      // Carry this exact detail page (including its carried-forward AI
+      // score, in location.state) through the login round trip, so a
+      // successful login returns the user here with the claim action
+      // still available - see Login.jsx/RequireAuth.jsx.
+      navigate("/auth/login", {
+        state: { from: location.pathname, fromState: location.state },
+      });
       return;
     }
 
@@ -362,6 +373,16 @@ export default function Match() {
     );
 
     if (eligible.length === 0) {
+      // Phase 4 Part 6 (Task B): confirming "this is my item" must not be
+      // blocked by requiring a report the user doesn't have - proceed
+      // directly with no OwnReportId; the backend grants contact access
+      // via a narrower, single-report claim instead of a full Match (see
+      // ClaimResultDto). "Not my item" still has nothing to scope a
+      // dismissal to without an own report, so that path is unchanged.
+      if (action === "mine") {
+        await confirmClaim(action, null);
+        return;
+      }
       setClaim({ action, status: "no-eligible" });
       return;
     }
@@ -383,7 +404,7 @@ export default function Match() {
     setClaim((current) => ({ ...(current ?? {}), action, status: "submitting" }));
 
     try {
-      await claimMatch({
+      const result = await claimMatch({
         searchResultReportId: report.id,
         ownReportId,
         observedScorePercentage: claimableScore,
@@ -391,7 +412,12 @@ export default function Match() {
       });
 
       if (action === "mine") {
-        setClaim({ action, status: "success" });
+        // Phase 4 Part 6 (Task B): result.match is null when this claim
+        // used the no-own-report path - an honest, distinct success note
+        // for that case, since it genuinely won't show up as a linked
+        // match in either party's Dashboard (there's no second report to
+        // pair it with), unlike the full-Match path above it.
+        setClaim({ action, status: "success", noOwnReport: !result?.match });
         // Decision #2 (Phase 4 Part 3): Contact is immediately reachable -
         // the pause is purely so the success state is visible, not a gate.
         window.setTimeout(() => navigate(`/match/${report.id}/contact`), 900);
@@ -992,7 +1018,7 @@ function ClaimPanel({ claim, tr, onSelectReport, onConfirm, onCancel }) {
                 onChange={() => onSelectReport(eligibleReport.id)}
               />
               <span className="truncate">
-                {eligibleReport.description || eligibleReport.aiObjectType || eligibleReport.id}
+                {reportHeadingTitle(eligibleReport, null) || eligibleReport.id}
               </span>
             </label>
           ))}
@@ -1028,19 +1054,30 @@ function ClaimPanel({ claim, tr, onSelectReport, onConfirm, onCancel }) {
 
   if (claim.status === "success") {
     return (
-      <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-success">
-        <Check className="size-3.5" />
-        {isMine
-          ? tr({
-              ar: "تم! جارٍ نقلك إلى صفحة التواصل…",
-              en: "Confirmed! Taking you to the contact page…",
-              ur: "تصدیق ہو گئی! رابطہ صفحہ کی طرف لے جایا جا رہا ہے…",
-            })
-          : tr({
-              ar: "تم الحفظ. جارٍ إعادتك إلى نتائج البحث…",
-              en: "Got it. Taking you back to search…",
-              ur: "محفوظ ہو گیا۔ آپ کو تلاش کی طرف واپس لے جایا جا رہا ہے…",
+      <div className="mt-3 space-y-1.5">
+        <div className="flex items-center gap-2 text-xs font-semibold text-success">
+          <Check className="size-3.5" />
+          {isMine
+            ? tr({
+                ar: "تم! جارٍ نقلك إلى صفحة التواصل…",
+                en: "Confirmed! Taking you to the contact page…",
+                ur: "تصدیق ہو گئی! رابطہ صفحہ کی طرف لے جایا جا رہا ہے…",
+              })
+            : tr({
+                ar: "تم الحفظ. جارٍ إعادتك إلى نتائج البحث…",
+                en: "Got it. Taking you back to search…",
+                ur: "محفوظ ہو گیا۔ آپ کو تلاش کی طرف واپس لے جایا جا رہا ہے…",
+              })}
+        </div>
+        {isMine && claim.noOwnReport && (
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {tr({
+              ar: "لأنه لا يوجد لديك بلاغ مطابق، لن تظهر هذه المطابقة في لوحتي الطرفين - لكن يمكنك التواصل الآن، وتم إخطار صاحب البلاغ.",
+              en: "Since you don't have a matching report of your own, this won't appear as a linked match in either Dashboard — but you can contact them now, and the report owner has been notified.",
+              ur: "چونکہ آپ کے پاس مماثل رپورٹ نہیں ہے، یہ دونوں ڈیش بورڈز میں منسلک میچ کے طور پر ظاہر نہیں ہوگا - لیکن آپ ابھی رابطہ کر سکتے ہیں، اور رپورٹ کے مالک کو مطلع کر دیا گیا ہے۔",
             })}
+          </p>
+        )}
       </div>
     );
   }

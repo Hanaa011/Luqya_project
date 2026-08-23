@@ -19,7 +19,17 @@ export default function RequireAuth({ children }) {
   }
 
   if (!profile) {
-    return <Navigate to="/auth/login" state={{ from: location.pathname }} replace />;
+    // Carry the incoming location's own router state (`fromState`) along
+    // with the path, so a page that depends on state passed to it (e.g.
+    // Match.jsx's carried-forward AI-search score) doesn't lose it across
+    // the login round trip - Login.jsx restores both together on success.
+    return (
+      <Navigate
+        to="/auth/login"
+        state={{ from: location.pathname, fromState: location.state }}
+        replace
+      />
+    );
   }
 
   return children;

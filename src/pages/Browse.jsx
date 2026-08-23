@@ -5,6 +5,7 @@ import { Search, MapPin, Clock, Loader2, AlertCircle, LogIn } from "lucide-react
 import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
 import { fetchMyReports } from "../lib/myReports";
+import { reportHeadingTitle } from "../lib/reportTitle";
 import { ReportType, reportStatusLabelKey } from "../api/enums";
 
 export default function Browse() {
@@ -202,7 +203,7 @@ export default function Browse() {
                       </div>
 
                       <h3 className="font-display text-xl font-bold mb-2">
-                        {report.aiObjectType || t("browseTitle")}
+                        {reportHeadingTitle(report, t("browseTitle"))}
                       </h3>
 
                       <p className="text-sm text-muted-foreground mb-6 line-clamp-2 leading-relaxed">

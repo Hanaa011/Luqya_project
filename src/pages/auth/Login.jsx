@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2, ArrowRight, AlertCircle } from "lucide-react";
 import AuthShell from "../../components/AuthShell";
 import { useI18n } from "../../lib/useI18n";
@@ -8,6 +8,7 @@ import { useAuth } from "../../lib/useAuth";
 export default function Login() {
   const { t, dir, locale } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -23,7 +24,15 @@ export default function Login() {
 
     try {
       await login({ userNameOrEmailAddress: userNameOrEmail, password });
-      navigate("/dashboard");
+      // A normal, unrelated login (typed the URL directly, clicked "Log
+      // in" from the nav) has no `state.from` and keeps landing on
+      // /dashboard, unchanged. A login triggered by an auth-gated action
+      // (RequireAuth, or Match.jsx's own claim-flow redirect) carries the
+      // page the user was trying to act on, plus that page's own router
+      // state (e.g. a carried-forward AI-search score) - restore both so
+      // the user lands back exactly where they left off.
+      const from = location.state?.from;
+      navigate(from || "/dashboard", { state: location.state?.fromState });
     } catch (err) {
       const fallback = {
         ar: "تعذّر تسجيل الدخول. تحقق من بياناتك وحاول مرة أخرى.",

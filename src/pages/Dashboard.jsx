@@ -9,14 +9,17 @@ import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
 import { listMatches } from "../api/matches";
 import { fetchMyReports } from "../lib/myReports";
+import { reportHeadingTitle } from "../lib/reportTitle";
 import { MatchStatus, ReportStatus, ReportType, matchStatusLabelKey, reportStatusLabelKey } from "../api/enums";
 
 function copy(lang, values) {
   return values[lang] ?? values.en;
 }
 
+// Phase 4 Part 6 (Task C): a short, extracted heading, not the full
+// description - matches every other page's report heading now.
 function reportSummary(report, fallback) {
-  return report?.description || report?.aiObjectType || fallback;
+  return reportHeadingTitle(report, fallback);
 }
 
 function formatDate(value, lang) {

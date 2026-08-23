@@ -11,6 +11,7 @@ import { listMatches } from "../api/matches";
 import { ReportType, MatchStatus } from "../api/enums";
 import { fetchMyReports } from "../lib/myReports";
 import { validateImageFile, ImageValidationReason } from "../lib/imageValidation";
+import { reportHeadingTitle } from "../lib/reportTitle";
 
 // Task C: same message set as ReportLost.jsx/ReportFound.jsx — one rejection
 // reason always reads the same way anywhere images are picked in this app.
@@ -414,7 +415,7 @@ export default function SmartSearch() {
                       </div>
                       <div className="p-5">
                         <h3 className="font-bold mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                          {r.description || r.aiObjectType}
+                          {reportHeadingTitle(r, t("browseTitle"))}
                         </h3>
                         {r.color && (
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
