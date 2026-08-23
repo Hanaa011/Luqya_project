@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   AlertCircle,
@@ -32,6 +32,29 @@ function reportSummary(report, fallback) {
 export default function Contact() {
   const { id } = useParams();
   const { t, lang } = useI18n();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Phase 4 Part 7 (Task B): the in-app "back" control was constructing a
+  // fresh navigation to `/match/${id}` with no state, unlike the browser's
+  // own native Back button - which correctly restores the history entry
+  // (and its state) it's returning to. That dropped Match.jsx's
+  // carried-forward AI-search score (location.state.scorePercentage, Phase
+  // 4 Part 5/6), making the claim action disappear on return. navigate(-1)
+  // pops the actual history entry, carrying its original state along,
+  // exactly like the native Back button - the idiomatic React Router fix.
+  // Fallback: `location.key === "default"` means this is the first entry
+  // in this tab's in-app history (a direct/typed link to Contact, or a
+  // hard refresh) - there is no real previous page to pop back to, so
+  // navigate(-1) would leave the app entirely. That case falls back to the
+  // same plain path navigation this control already used, unchanged.
+  function goBack() {
+    if (location.key !== "default") {
+      navigate(-1);
+    } else {
+      navigate(`/match/${id}`);
+    }
+  }
 
   const [report, setReport] = useState(null);
   const [reporter, setReporter] = useState(null);
@@ -110,9 +133,9 @@ export default function Contact() {
       <div className="flex flex-col items-center justify-center gap-3 py-32 px-6 text-center">
         <AlertCircle className="size-7 text-error" />
         <p className="max-w-md text-sm text-muted-foreground">{message}</p>
-        <Link to={`/match/${id}`} className="mt-2 text-sm font-semibold text-primary hover:underline">
+        <button type="button" onClick={goBack} className="mt-2 text-sm font-semibold text-primary hover:underline">
           {copy(lang, { ar: "العودة إلى البلاغ", en: "Back to report", ur: "رپورٹ پر واپس جائیں" })}
-        </Link>
+        </button>
       </div>
     );
   }
@@ -126,13 +149,14 @@ export default function Contact() {
   return (
     <section className="py-10 sm:py-14 lg:py-20">
       <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <Link
-          to={`/match/${report.id}`}
+        <button
+          type="button"
+          onClick={goBack}
           className="mb-7 inline-flex min-h-11 items-center gap-2 rounded-xl px-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowLeft className={`size-4 ${lang === "ar" || lang === "ur" ? "rotate-180" : ""}`} />
           {copy(lang, { ar: "العودة إلى البلاغ", en: "Back to report", ur: "رپورٹ پر واپس جائیں" })}
-        </Link>
+        </button>
 
         <div className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-soft">
           <div className={`border-b border-border px-6 py-6 sm:px-8 ${isLost ? "bg-warn-tint/50" : "bg-success-tint/50"}`}>

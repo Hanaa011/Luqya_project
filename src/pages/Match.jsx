@@ -387,11 +387,13 @@ export default function Match() {
       return;
     }
 
-    if (eligible.length === 1) {
-      await confirmClaim(action, eligible[0].id);
-      return;
-    }
-
+    // Phase 4 Part 7 (Task A): the picker is now always shown whenever at
+    // least one eligible report exists - even exactly one - so the user
+    // always gets the chance to say none of their existing reports
+    // actually relate to this item (the "none of these" option, added
+    // below the real reports in ClaimPanel's "picking" state). The old
+    // "exactly one eligible report -> auto-select, skip the picker"
+    // shortcut (Phase 4 Part 5) is removed per this task's explicit design.
     setClaim({
       action,
       status: "picking",
@@ -401,6 +403,21 @@ export default function Match() {
   }
 
   async function confirmClaim(action, ownReportId) {
+    // Phase 4 Part 7 (Task A): "none of these" reuses the exact
+    // zero-eligible-reports path (Phase 4 Part 6) for "this is my item" -
+    // but "not my item" has no existing backend capability to dismiss a
+    // result without a real own report to scope the dismissal to (the
+    // search-time exclusion filter, Phase 4 Part 3/4, keys off the
+    // caller's own reports). Per this task's explicit "do not add new
+    // backend capability" instruction, this is investigated and confirmed
+    // insufficient as-is - handled here with the same honest, pre-existing
+    // "no-eligible" client-side state instead of sending a request the
+    // backend would reject.
+    if (action === "not-mine" && ownReportId == null) {
+      setClaim({ action, status: "no-eligible" });
+      return;
+    }
+
     setClaim((current) => ({ ...(current ?? {}), action, status: "submitting" }));
 
     try {
@@ -1022,6 +1039,26 @@ function ClaimPanel({ claim, tr, onSelectReport, onConfirm, onCancel }) {
               </span>
             </label>
           ))}
+          {/* Phase 4 Part 7 (Task A): always present, distinct from every
+              real report - lets the user say none of their existing
+              reports actually relate to this item. Reuses the exact
+              zero-eligible-reports contact path (Phase 4 Part 6) via
+              ownReportId: null - see confirmClaim. */}
+          <label className="flex items-center gap-2 text-xs cursor-pointer border-t border-border pt-1.5 mt-1.5">
+            <input
+              type="radio"
+              name="claim-report"
+              checked={claim.selectedReportId == null}
+              onChange={() => onSelectReport(null)}
+            />
+            <span className="truncate text-muted-foreground">
+              {tr({
+                ar: "لا شيء من هذه — لم أرفع بلاغًا لهذا الغرض بعد",
+                en: "None of these — I haven't reported this item yet",
+                ur: "ان میں سے کوئی نہیں — میں نے ابھی تک اس چیز کی رپورٹ نہیں کی",
+              })}
+            </span>
+          </label>
         </div>
         <div className="flex gap-2">
           <button
@@ -1075,7 +1112,14 @@ function ClaimPanel({ claim, tr, onSelectReport, onConfirm, onCancel }) {
               ar: "لأنه لا يوجد لديك بلاغ مطابق، لن تظهر هذه المطابقة في لوحتي الطرفين - لكن يمكنك التواصل الآن، وتم إخطار صاحب البلاغ.",
               en: "Since you don't have a matching report of your own, this won't appear as a linked match in either Dashboard — but you can contact them now, and the report owner has been notified.",
               ur: "چونکہ آپ کے پاس مماثل رپورٹ نہیں ہے، یہ دونوں ڈیش بورڈز میں منسلک میچ کے طور پر ظاہر نہیں ہوگا - لیکن آپ ابھی رابطہ کر سکتے ہیں، اور رپورٹ کے مالک کو مطلع کر دیا گیا ہے۔",
-            })}
+            })}{" "}
+            {/* Phase 4 Part 7 (Task A, design point 4, optional): reuses
+                the exact "Create one" wording/link ClaimPanel's own
+                no-eligible state already uses - never a blocking step,
+                just an offer for the full both-parties experience later. */}
+            <Link to="/report" className="font-semibold text-primary hover:underline">
+              {tr({ ar: "أنشئ بلاغًا لهذا الغرض", en: "Create a report for this item", ur: "اس چیز کی رپورٹ بنائیں" })}
+            </Link>
           </p>
         )}
       </div>

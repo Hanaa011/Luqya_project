@@ -38,11 +38,12 @@ function imageValidationMessage(tr, reason) {
   }
 }
 
-// Defaulting to "found": the dominant use case here is "I lost something,
-// help me find who has it" — so the default search scope is the other
-// side of that exchange. "Lost"/"All" stay one click away for the
-// opposite case (you found something and want to see if it was reported
-// missing).
+// Phase 4 Part 7 (Task C): defaulting to "all" — a first-time visitor to
+// /search should see results across both Lost and Found by default,
+// without needing to manually change the filter first. (Previously
+// defaulted to "found" on the theory that "I lost something, help me
+// find who has it" was the dominant case — overridden by this task's
+// explicit instruction; "Found"/"Lost" remain one click away either way.)
 const TYPE_FILTERS = [
   { key: "found", value: ReportType.FOUND },
   { key: "lost", value: ReportType.LOST },
@@ -53,7 +54,7 @@ export default function SmartSearch() {
   const { t, tr } = useI18n();
   const { userId } = useAuth();
   const [text, setText] = useState("");
-  const [typeFilter, setTypeFilter] = useState("found");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [status, setStatus] = useState("idle"); // idle | loading | success | empty | error
   const [results, setResults] = useState([]);
   const [errorMsg, setErrorMsg] = useState(null);
