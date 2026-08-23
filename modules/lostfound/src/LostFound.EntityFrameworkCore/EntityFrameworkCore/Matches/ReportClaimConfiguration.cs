@@ -16,6 +16,13 @@ namespace LostFound.EntityFrameworkCore
 
                 b.Property(x => x.ObservedScorePercentage).HasColumnType("decimal(5,2)");
 
+                // Phase 4 Part 8 (Task B): default true so any row from
+                // before this column existed (all of which were "this is
+                // my item" grants under Part 6's original, single-purpose
+                // design) is correctly interpreted as IsMine=true by the
+                // migration itself, not just by application-layer code.
+                b.Property(x => x.IsMine).HasDefaultValue(true);
+
                 b.HasOne<Report>().WithMany().HasForeignKey(x => x.ReportId).OnDelete(DeleteBehavior.Restrict).IsRequired();
 
                 // Not unique: ExistsAsync is used to prevent duplicates at

@@ -234,44 +234,69 @@ namespace LostFound.Matches
             return match;
         }
 
-        // Phase 4 Part 6 (Task B): "this is my item" for a caller with no
-        // eligible own report to pair into a full Match (Match requires
-        // both a LostReportId and a FoundReportId - there is no second
-        // report here). Grants the same immediate contact access a real
+        // Phase 4 Part 6 (Task B), extended by Phase 4 Part 8 (Task B): a
+        // caller's recorded disposition toward one specific report,
+        // independent of any own report - originally "this is my item"
+        // only, now also "not my item" (see ReportClaim.IsMine).
+        //
+        // IsMine=true grants the same immediate contact access a real
         // claim would (see ReporterAppService.GetRelatedReporterIdsQueryableAsync,
-        // which this record extends), scoped to exactly this
-        // (claimant, report) pair - never a general loosening of the
-        // Phase 4 Part 2 contact rule, and never visible in any "both
-        // parties" Dashboard view, since there is no second report to
-        // show it on. Idempotent: re-confirming does not insert a second
-        // row or a second notification.
-        public async Task<ReportClaim> GetOrCreateClaimWithoutOwnReportAsync(
-            Guid reportId, Guid claimantUserId, double observedScorePercentage)
+        // which this record extends, filtered to IsMine=true only),
+        // scoped to exactly this (claimant, report) pair - never a
+        // general loosening of the Phase 4 Part 2 contact rule, and never
+        // visible in any "both parties" Dashboard view, since there is no
+        // second report to show it on. It also sends a one-sided
+        // Notification to the claimed report's own reporter - there's no
+        // second, paired report here to notify "both parties" the way
+        // NotifyBothReportersAsync does for a real Match, but the report's
+        // own reporter can still be told, honestly, that someone claims
+        // this is theirs.
+        //
+        // IsMine=false (Phase 4 Part 8) grants no contact access and
+        // sends no notification - a silent dismissal, matching Phase 4
+        // Part 3's original decision that notifying an uninvolved
+        // stranger "someone dismissed you" would be noise about an
+        // interaction they were never part of.
+        //
+        // Idempotent, and now update-in-place: at most one row exists per
+        // (reportId, claimantUserId) - re-confirming the same disposition
+        // does nothing new; recording the OPPOSITE disposition (e.g. the
+        // user first said "not mine", later decides it actually is)
+        // updates the existing row rather than accumulating a second one,
+        // since a user's disposition toward a given report is singular.
+        public async Task<ReportClaim> GetOrCreateReportClaimAsync(
+            Guid reportId, Guid claimantUserId, bool isMine, double observedScorePercentage)
         {
             var claimedReport = await _reportRepository.GetAsync(reportId);
 
             var existing = await _reportClaimRepository.FindAsync(reportId, claimantUserId);
             if (existing != null)
             {
+                if (existing.IsMine == isMine)
+                {
+                    return existing;
+                }
+
+                existing.UpdateDisposition(isMine, (decimal)observedScorePercentage);
+                await _reportClaimRepository.UpdateAsync(existing, autoSave: true);
                 return existing;
             }
 
-            var claim = new ReportClaim(GuidGenerator.Create(), reportId, claimantUserId, (decimal)observedScorePercentage);
+            var claim = new ReportClaim(GuidGenerator.Create(), reportId, claimantUserId, isMine, (decimal)observedScorePercentage);
             await _reportClaimRepository.InsertAsync(claim, autoSave: true);
 
-            // There's no second, paired report here to notify "both
-            // parties" the way NotifyBothReportersAsync does for a real
-            // Match - but the claimed report's own reporter can still be
-            // told, honestly, that someone claims this is theirs.
-            await _notificationRepository.InsertAsync(
-                new Notification(
-                    GuidGenerator.Create(),
-                    claimedReport.ReporterId,
-                    claimedReport.Id,
-                    "Someone claimed your item",
-                    "A user confirmed this report matches something they lost or found and can now see your contact details."
-                )
-            );
+            if (isMine)
+            {
+                await _notificationRepository.InsertAsync(
+                    new Notification(
+                        GuidGenerator.Create(),
+                        claimedReport.ReporterId,
+                        claimedReport.Id,
+                        "Someone claimed your item",
+                        "A user confirmed this report matches something they lost or found and can now see your contact details."
+                    )
+                );
+            }
 
             return claim;
         }

@@ -103,8 +103,15 @@ namespace LostFound.Reporters
                 .Where(m => myReportIds.Contains(m.LostReportId) || myReportIds.Contains(m.FoundReportId))
                 .Select(m => myReportIds.Contains(m.LostReportId) ? m.FoundReportId : m.LostReportId);
 
+            // Phase 4 Part 8 (Task B): IsMine == true only - ReportClaim
+            // now also represents "not my item" (a dismissal), which must
+            // NEVER grant contact access. Without this filter, dismissing
+            // a result as "not mine" would perversely unlock the same
+            // reporter's contact info it just said had nothing to do with
+            // the caller - a real security regression this filter exists
+            // specifically to prevent.
             var directlyClaimedReportIds = claimQueryable
-                .Where(c => c.ClaimantUserId == CurrentUser.Id)
+                .Where(c => c.ClaimantUserId == CurrentUser.Id && c.IsMine)
                 .Select(c => c.ReportId);
 
             var accessibleReportIds = relatedOtherReportIds.Concat(directlyClaimedReportIds);

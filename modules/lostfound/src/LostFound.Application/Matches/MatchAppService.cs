@@ -1,9 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Authorization;
@@ -17,6 +17,7 @@ namespace LostFound.Matches
     {
         private readonly IMatchRepository _matchRepository;
         private readonly IReportRepository _reportRepository;
+        private readonly IReportClaimRepository _reportClaimRepository;
         private readonly MatchManager _matchManager;
         private readonly IEmbeddingEngine _embeddingEngine;
         private readonly IConfiguration _configuration;
@@ -24,12 +25,14 @@ namespace LostFound.Matches
         public MatchAppService(
             IMatchRepository matchRepository,
             IReportRepository reportRepository,
+            IReportClaimRepository reportClaimRepository,
             MatchManager matchManager,
             IEmbeddingEngine embeddingEngine,
             IConfiguration configuration)
         {
             _matchRepository = matchRepository;
             _reportRepository = reportRepository;
+            _reportClaimRepository = reportClaimRepository;
             _matchManager = matchManager;
             _embeddingEngine = embeddingEngine;
             _configuration = configuration;
@@ -87,11 +90,20 @@ namespace LostFound.Matches
         // domain service with no auth concerns, consistent with the rest of
         // this class's methods.
         //
-        // Phase 4 Part 6 (Task B): OwnReportId is now optional. When the
-        // caller genuinely owns no eligible report, confirming "this is my
-        // item" no longer requires creating one first - see the null
-        // branch below, which records a narrower ReportClaim instead of a
-        // full, two-sided Match and still grants immediate contact access.
+        // Phase 4 Part 8 (Task B): "Not my item" (IsMine=false) is handled
+        // FIRST, unconditionally, regardless of whether OwnReportId is
+        // supplied - it always records a lightweight ReportClaim
+        // disposition now (see MatchManager.GetOrCreateReportClaimAsync),
+        // never touches Match at all, and never requires the caller to own
+        // any report. This retires the old design (Phase 4 Part 3) where a
+        // dismissal against an owned report created/rejected a real,
+        // two-sided Match - that coupling was architecturally backwards
+        // (a dismissal has no real reason to involve any of the caller's
+        // own reports) and is what forced the picker to appear for "not my
+        // item" at all. OwnReportId is accepted but ignored for this
+        // action - the frontend no longer sends one (see Match.jsx's
+        // simple confirm/cancel UI), but an old/cached client sending one
+        // is harmless, not an error.
         public async Task<ClaimResultDto> ClaimAsync(ClaimMatchDto input)
         {
             if (!CurrentUser.IsAuthenticated || CurrentUser.Id == null)
@@ -99,22 +111,25 @@ namespace LostFound.Matches
                 throw new AbpAuthorizationException("You must be signed in to claim a search result.");
             }
 
+            if (!input.IsMine)
+            {
+                await _matchManager.GetOrCreateReportClaimAsync(
+                    input.SearchResultReportId, CurrentUser.Id.Value, isMine: false, input.ObservedScorePercentage);
+
+                return new ClaimResultDto { Match = null, ContactAccessGranted = false };
+            }
+
+            // Phase 4 Part 6 (Task B): OwnReportId is optional for "this is
+            // my item". When the caller genuinely owns no eligible report
+            // (or explicitly picked "none of these", Phase 4 Part 7),
+            // confirming no longer requires creating one first - see the
+            // null branch below, which records a narrower ReportClaim
+            // instead of a full, two-sided Match and still grants
+            // immediate contact access.
             if (!input.OwnReportId.HasValue)
             {
-                // "Not my item" with no own report has nothing to scope the
-                // dismissal to (the search-time exclusion filter - Phase 4
-                // Part 3/4 - works by cross-referencing the caller's own
-                // reports' rejected matches) - the frontend's own picker
-                // already never reaches this endpoint in that case; this is
-                // a defensive guard, not a real path.
-                if (!input.IsMine)
-                {
-                    throw new UserFriendlyException(
-                        "Dismissing a search result requires one of your own reports to link the dismissal to.");
-                }
-
-                await _matchManager.GetOrCreateClaimWithoutOwnReportAsync(
-                    input.SearchResultReportId, CurrentUser.Id.Value, input.ObservedScorePercentage);
+                await _matchManager.GetOrCreateReportClaimAsync(
+                    input.SearchResultReportId, CurrentUser.Id.Value, isMine: true, input.ObservedScorePercentage);
 
                 return new ClaimResultDto { Match = null, ContactAccessGranted = true };
             }
@@ -128,31 +143,40 @@ namespace LostFound.Matches
             var match = await _matchManager.GetOrCreateMatchForClaimAsync(
                 input.SearchResultReportId, input.OwnReportId.Value, input.ObservedScorePercentage);
 
-            if (input.IsMine)
+            // Decision #2 (Phase 4 Part 3): reuses AcceptAsync exactly
+            // as-is (including its existing "both parties notified" side
+            // effect) so Contact access unlocks immediately, with no
+            // dependency on the other party - AcceptAsync already behaves
+            // this way today (Match.jsx's Contact link never checks
+            // match.status), so no adjustment to Accept's own semantics
+            // was needed.
+            var accepted = await AcceptAsync(match.Id);
+            return new ClaimResultDto { Match = accepted, ContactAccessGranted = true };
+        }
+
+        // Phase 4 Part 8 (Task B, point 4): the report ids the current
+        // user has recorded a "not my item" disposition toward - used by
+        // the frontend's search-time exclusion filter (Phase 4 Part 3/4)
+        // so a dismissed result never resurfaces, now regardless of
+        // whether the dismissing user owns any report of their own (the
+        // original exclusion mechanism could only key off the user's own
+        // reports' rejected Match rows, which no longer applies once a
+        // dismissal can be recorded with zero reports owned). Read-only,
+        // scoped to exactly the caller's own dispositions - not a general
+        // ReportClaim listing endpoint.
+        public async Task<List<Guid>> GetMyDismissedReportIdsAsync()
+        {
+            if (!CurrentUser.IsAuthenticated || CurrentUser.Id == null)
             {
-                // Decision #2: reuses AcceptAsync exactly as-is (including
-                // its existing "both parties notified" side effect) so
-                // Contact access unlocks immediately, with no dependency on
-                // the other party - AcceptAsync already behaves this way
-                // today (Match.jsx's Contact link never checks match.status),
-                // so no adjustment to Accept's own semantics was needed.
-                var accepted = await AcceptAsync(match.Id);
-                return new ClaimResultDto { Match = accepted, ContactAccessGranted = true };
+                return new List<Guid>();
             }
 
-            // "Not my item": persisted as MatchStatus.Rejected on the same
-            // row (decision #3 - sufficient on its own, see the report's
-            // discussion of search-time exclusion), but deliberately NOT a
-            // call to the existing RejectAsync - that method's
-            // NotifyMatchDecisionAsync side effect is meant for a match
-            // both parties already knew was under review (an AI suggestion
-            // being turned down); a candidate the searching user silently
-            // decided isn't theirs was never surfaced to the other party at
-            // all, so notifying them "someone rejected you" would be noise
-            // about an interaction they were never part of.
-            match.Reject();
-            await _matchRepository.UpdateAsync(match);
-            return new ClaimResultDto { Match = MapToDto(match), ContactAccessGranted = false };
+            var queryable = await _reportClaimRepository.GetQueryableAsync();
+            return await AsyncExecuter.ToListAsync(
+                queryable
+                    .Where(c => c.ClaimantUserId == CurrentUser.Id.Value && !c.IsMine)
+                    .Select(c => c.ReportId)
+            );
         }
 
         private static MatchDto MapToDto(Match match)
