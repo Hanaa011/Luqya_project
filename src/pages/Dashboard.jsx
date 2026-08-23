@@ -173,6 +173,21 @@ export default function Dashboard() {
     return myReportIds.has(match.lostReportId) ? match.foundReportId : match.lostReportId;
   }
 
+  // Phase 4 Part 8 (Task C): the report id ON THE CURRENT USER'S OWN side
+  // of this specific match - passed as the `?from=` query param so
+  // Match.jsx (which predates Phase 4 and has no other way to know which
+  // of a report's possibly-several Match rows this link was actually
+  // about) can pick out this exact match via its own existing
+  // `fromReportId` disambiguation, the same mechanism Match.jsx's own
+  // "Report matches" candidate links already use
+  // (`/match/${candidateReport.id}?from=${report.id}`). Without this,
+  // a report involved in more than one Match could resolve to the WRONG
+  // pairedReport/match on arrival, making isReviewingMatch (and therefore
+  // the Contact link) incorrectly false.
+  function myReportIdInMatch(match) {
+    return myReportIds.has(match.lostReportId) ? match.lostReportId : match.foundReportId;
+  }
+
   return (
     <section className="py-10 sm:py-14 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -236,7 +251,7 @@ export default function Dashboard() {
                       <PendingMatchCard
                         key={match.id}
                         match={match}
-                        href={`/match/${otherReportId(match)}`}
+                        href={`/match/${otherReportId(match)}?from=${myReportIdInMatch(match)}`}
                         lang={lang}
                         t={t}
                       />
@@ -314,7 +329,7 @@ export default function Dashboard() {
                     <DecisionMatchRow
                       key={match.id}
                       match={match}
-                      href={`/match/${otherReportId(match)}`}
+                      href={`/match/${otherReportId(match)}?from=${myReportIdInMatch(match)}`}
                       lang={lang}
                       t={t}
                       last={index === decidedMatches.length - 1}

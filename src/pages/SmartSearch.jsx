@@ -7,7 +7,7 @@ import { useAuth } from "../lib/useAuth";
 import DammaMark from "../components/DammaMark";
 import { aiSearch, imageFileToBase64 } from "../api/search";
 import { reportImageUrl } from "../api/reports";
-import { listMatches } from "../api/matches";
+import { listMatches, getMyDismissedReportIds } from "../api/matches";
 import { ReportType, MatchStatus } from "../api/enums";
 import { fetchMyReports } from "../lib/myReports";
 import { validateImageFile, ImageValidationReason } from "../lib/imageValidation";
@@ -162,6 +162,8 @@ export default function SmartSearch() {
       // the current user's own reports (resolved via Report.CreatorId in
       // fetchMyReports) — not a cached, session-only guess.
       if (userId) {
+        let dismissedCount = 0;
+
         const mine = await fetchMyReports({ userId });
         if (mine.reliable && mine.reports.length > 0) {
           const myIds = new Set(mine.reports.map((r) => r.id));
@@ -169,16 +171,14 @@ export default function SmartSearch() {
           filtered = filtered.filter((r) => !myIds.has(r.reportId));
           setOwnReportsExcluded(before - filtered.length);
 
-          // Phase 4 Part 3 (Task A.4/decision #3): "Not my item" is
-          // persisted as a real, permanent MatchStatus.Rejected row
-          // (api/matches.js claimMatch) — this is where that persistence
-          // actually takes effect on a future search: any candidate the
-          // user already dismissed against ANY of their own reports is
-          // excluded again here, the same real-data cross-reference
-          // pattern as the own-reports exclusion just above, not a
-          // session-local list. Real exclusion, traced through the actual
-          // candidate list returned by this search, not just recorded and
-          // ignored.
+          // Phase 4 Part 3 (Task A.4/decision #3), superseded as the only
+          // mechanism by Phase 4 Part 8 (see below) but kept for backward
+          // compatibility with dismissals recorded before that redesign:
+          // a "not my item" click that happened to go through the old
+          // has-own-report path persisted as a real MatchStatus.Rejected
+          // row — this cross-references those against the user's own
+          // reports, the same real-data pattern as the own-reports
+          // exclusion just above, not a session-local list.
           try {
             const matchesRes = await listMatches({ maxResultCount: 200, sorting: "creationTime desc" });
             const dismissedReportIds = new Set(
@@ -193,7 +193,7 @@ export default function SmartSearch() {
             if (dismissedReportIds.size > 0) {
               const beforeDismissed = filtered.length;
               filtered = filtered.filter((r) => !dismissedReportIds.has(r.reportId));
-              setDismissedExcluded(beforeDismissed - filtered.length);
+              dismissedCount += beforeDismissed - filtered.length;
             }
           } catch {
             // Non-fatal: if the matches list can't be fetched, dismissed
@@ -202,6 +202,29 @@ export default function SmartSearch() {
             // still applies.
           }
         }
+
+        // Phase 4 Part 8 (Task B, point 4): the real, own-report-independent
+        // exclusion — reports the user has directly recorded a "not my
+        // item" disposition toward (ReportClaim.IsMine == false), via
+        // MatchAppService.GetMyDismissedReportIdsAsync. Runs for EVERY
+        // authenticated user, not gated on owning any report at all —
+        // this is the mechanism that actually closes the gap the old,
+        // Match-based exclusion above could never handle (a user with
+        // zero reports dismissing a result and it genuinely never
+        // resurfacing for them).
+        try {
+          const dismissedIds = await getMyDismissedReportIds();
+          if (dismissedIds?.length > 0) {
+            const dismissedSet = new Set(dismissedIds);
+            const beforeDirect = filtered.length;
+            filtered = filtered.filter((r) => !dismissedSet.has(r.reportId));
+            dismissedCount += beforeDirect - filtered.length;
+          }
+        } catch {
+          // Non-fatal, same reasoning as the Match-based exclusion above.
+        }
+
+        setDismissedExcluded(dismissedCount);
       }
 
       if (filtered.length > 0) {

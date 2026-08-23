@@ -352,6 +352,16 @@ export default function Match() {
       return;
     }
 
+    // Phase 4 Part 8 (Task B): "not my item" is now a simple confirmation
+    // only - no picker, no eligible-report lookup, no dependency on
+    // whether the caller owns any report at all. This is the entire
+    // redesign: dismissing a result never had a real reason to involve
+    // any of the caller's own reports in the first place.
+    if (action === "not-mine") {
+      setClaim({ action, status: "confirming" });
+      return;
+    }
+
     setClaim({ action, status: "loading" });
 
     const mine = await fetchMyReports({ userId });
@@ -377,13 +387,8 @@ export default function Match() {
       // blocked by requiring a report the user doesn't have - proceed
       // directly with no OwnReportId; the backend grants contact access
       // via a narrower, single-report claim instead of a full Match (see
-      // ClaimResultDto). "Not my item" still has nothing to scope a
-      // dismissal to without an own report, so that path is unchanged.
-      if (action === "mine") {
-        await confirmClaim(action, null);
-        return;
-      }
-      setClaim({ action, status: "no-eligible" });
+      // ClaimResultDto).
+      await confirmClaim(action, null);
       return;
     }
 
@@ -394,6 +399,8 @@ export default function Match() {
     // below the real reports in ClaimPanel's "picking" state). The old
     // "exactly one eligible report -> auto-select, skip the picker"
     // shortcut (Phase 4 Part 5) is removed per this task's explicit design.
+    // (Only "this is my item" reaches this point at all - "not my item"
+    // returned above, per Phase 4 Part 8's redesign.)
     setClaim({
       action,
       status: "picking",
@@ -403,21 +410,6 @@ export default function Match() {
   }
 
   async function confirmClaim(action, ownReportId) {
-    // Phase 4 Part 7 (Task A): "none of these" reuses the exact
-    // zero-eligible-reports path (Phase 4 Part 6) for "this is my item" -
-    // but "not my item" has no existing backend capability to dismiss a
-    // result without a real own report to scope the dismissal to (the
-    // search-time exclusion filter, Phase 4 Part 3/4, keys off the
-    // caller's own reports). Per this task's explicit "do not add new
-    // backend capability" instruction, this is investigated and confirmed
-    // insufficient as-is - handled here with the same honest, pre-existing
-    // "no-eligible" client-side state instead of sending a request the
-    // backend would reject.
-    if (action === "not-mine" && ownReportId == null) {
-      setClaim({ action, status: "no-eligible" });
-      return;
-    }
-
     setClaim((current) => ({ ...(current ?? {}), action, status: "submitting" }));
 
     try {
@@ -940,7 +932,7 @@ function MetaItem({ Icon, label, value }) {
 // natural next step after reviewing this report's own details, rather
 // than a repeat of the old inline search-result buttons.
 function ClaimAction({ t, tr, claim, onStart, onSelectReport, onConfirm, onCancel }) {
-  const busy = claim && !["error", "no-eligible", "picking"].includes(claim.status);
+  const busy = claim && !["error", "confirming", "picking"].includes(claim.status);
 
   return (
     <div>
@@ -995,22 +987,36 @@ function ClaimPanel({ claim, tr, onSelectReport, onConfirm, onCancel }) {
     );
   }
 
-  if (claim.status === "no-eligible") {
+  // Phase 4 Part 8 (Task B): "not my item" is a simple confirmation only
+  // - no picker, no report-eligibility lookup of any kind. Reached
+  // directly from startClaim, for every user regardless of what reports
+  // (if any) they own.
+  if (claim.status === "confirming") {
     return (
-      <div className="mt-3">
-        <p className="text-xs leading-relaxed text-muted-foreground">
+      <div className="mt-3 border-t border-border pt-4">
+        <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
           {tr({
-            ar: "لا يوجد لديك بلاغ مفتوح من النوع المقابل لربط هذا الإجراء به.",
-            en: "You don't have an open report of the matching type to link this to.",
-            ur: "اس عمل کو منسلک کرنے کے لیے آپ کے پاس مناسب قسم کی کوئی کھلی رپورٹ نہیں ہے۔",
-          })}{" "}
-          <Link to="/report" className="font-semibold text-primary hover:underline">
-            {tr({ ar: "أنشئ بلاغًا", en: "Create one", ur: "ایک بنائیں" })}
-          </Link>
+            ar: "هل أنت متأكد أن هذا ليس غرضك؟",
+            en: "Are you sure this isn't your item?",
+            ur: "کیا آپ کو یقین ہے کہ یہ آپ کی چیز نہیں ہے؟",
+          })}
         </p>
-        <button type="button" onClick={onCancel} className="mt-2 text-xs font-semibold text-muted-foreground hover:text-foreground">
-          {tr({ ar: "إغلاق", en: "Dismiss", ur: "برخاست کریں" })}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="flex-1 rounded-xl bg-primary text-primary-foreground text-xs font-bold py-2"
+          >
+            {tr({ ar: "تأكيد", en: "Confirm", ur: "تصدیق کریں" })}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-xl border border-border text-xs font-semibold px-3 py-2"
+          >
+            {tr({ ar: "إلغاء", en: "Cancel", ur: "منسوخ کریں" })}
+          </button>
+        </div>
       </div>
     );
   }
