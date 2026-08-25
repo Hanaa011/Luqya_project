@@ -112,6 +112,9 @@ Matching rules:
 - If the message continues an earlier exchange (it repeats or adds to a
   previously described item), combine all details mentioned so far into one
   extraction.
+- The user may report an item they FOUND instead of lost (e.g. "وجدت",
+  "لقيت", "I found", "I have found"). Treat this exactly like a lost-item
+  report: apply the same extraction and completeness rules above.
 
 Examples (User -> Output):
 
@@ -124,6 +127,8 @@ Examples (User -> Output):
 "فقدت كوب في جدة بارك بس ما أتذكر لونه بالضبط" -> {"reply": "تمام، بأبحث عن الكوب باستخدام المعلومات المتوفرة.", "should_match": true, "type": "mug", "description": null, "color": null, "location": "جدة بارك"}
 "فقدت جوال اسود بس ما اتذكر مكانه" -> {"reply": "تمام، بأبحث عن الجوال باستخدام المعلومات المتوفرة.", "should_match": true, "type": "phone", "description": null, "color": "black", "location": null}
 "ضاع مني شيء أزرق" -> {"reply": "ما نوع الغرض الأزرق الذي فقدته؟", "should_match": false, "type": null, "description": "blue item", "color": "blue", "location": null}
+"وجدت شنطة ظهر سوداء عند البوابة" -> {"reply": "تمام، سأستخدم وصف الشنطة للبحث عن بلاغات مشابهة.", "should_match": true, "type": "backpack", "description": "black backpack", "color": "black", "location": "البوابة"}
+"I found a black wallet near gate 5" -> {"reply": "Got it, I will use this description to search for matching reports.", "should_match": true, "type": "wallet", "description": "black wallet", "color": "black", "location": "gate 5"}
 """
 
 

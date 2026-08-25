@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using System.Threading.Tasks;
 using LostFound.AI;
+using LostFound.AI.AiService;
 using LostFound.AI.Importers;
 using LostFound.Reports;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +28,8 @@ public class LostFoundApplicationModule : AbpModule
         context.Services.AddLostFoundImageValidation(
             context.Services.GetConfiguration());
         context.Services.AddLostFoundAiProviders(
+            context.Services.GetConfiguration());
+        context.Services.AddLostFoundAiServiceClient(
             context.Services.GetConfiguration());
         context.Services.AddLostFoundLocalAiRuntime(
             context.Services.GetConfiguration());

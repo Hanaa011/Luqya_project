@@ -71,8 +71,32 @@ def get_opposite_reports(selected_report: ItemData, reports: list[ItemData]) -> 
     ]
 
 
-def get_found_reports(reports: list[ItemData]) -> list[ItemData]:
-    return [report for report in reports if report.report_id is not None and report.is_item_with_finder is True]
+def get_reports_by_kind(reports: list[ItemData], is_item_with_finder: bool) -> list[ItemData]:
+    return [
+        report
+        for report in reports
+        if report.report_id is not None and report.is_item_with_finder is is_item_with_finder
+    ]
+
+
+def parse_report_kind(report_kind: str) -> bool:
+    """True = the searcher FOUND an item (candidates are lost reports),
+    False = the searcher LOST an item (candidates are found reports)."""
+    if report_kind not in ("lost", "found"):
+        raise HTTPException(status_code=400, detail="report_kind must be 'lost' or 'found'.")
+
+    return report_kind == "found"
+
+
+def run_image_analysis(image: UploadFile, image_bytes: bytes) -> dict:
+    try:
+        return analyze_item_image(image_bytes=image_bytes, mime_type=image.content_type)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail="AI returned invalid image analysis data.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 def serialize_match_result(match: Any) -> dict:
@@ -189,12 +213,8 @@ async def match_report(report_id: str):
     )
 
 
-@router.post("/match-image")
-async def match_image(
-    image: UploadFile = File(...),
-    location_name: str | None = Form(None),
-    lost_found_date: str | None = Form(None),
-):
+@router.post("/analyze-image")
+async def analyze_image(image: UploadFile = File(...)):
     if not image.content_type or not image.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="The uploaded file must be an image.")
 
@@ -203,41 +223,69 @@ async def match_image(
     if not image_bytes:
         raise HTTPException(status_code=400, detail="The uploaded image is empty.")
 
-    try:
-        image_data = analyze_item_image(image_bytes=image_bytes, mime_type=image.content_type)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail="AI returned invalid image analysis data.") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    image_data = run_image_analysis(image, image_bytes)
+
+    return {
+        "type": clean_text(image_data.get("type")),
+        "description": clean_text(image_data.get("description")),
+        "color": clean_text(image_data.get("color")),
+    }
+
+
+@router.post("/match-image")
+async def match_image(
+    image: UploadFile = File(...),
+    message: str | None = Form(None),
+    location_name: str | None = Form(None),
+    lost_found_date: str | None = Form(None),
+    report_kind: str = Form("lost"),
+):
+    is_finder = parse_report_kind(report_kind)
+
+    if not image.content_type or not image.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="The uploaded file must be an image.")
+
+    image_bytes = await image.read()
+
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="The uploaded image is empty.")
+
+    image_data = run_image_analysis(image, image_bytes)
 
     item_type = clean_text(image_data.get("type"))
     description = clean_text(image_data.get("description"))
     color = clean_text(image_data.get("color"))
 
+    message_text = clean_text(message)
+    if message_text:
+        description = f"{description}. {message_text}" if description else message_text
+
     if not item_type and not description:
         raise HTTPException(status_code=422, detail="The image does not contain a clearly identifiable item.")
 
-    lost_item = ItemData(
+    query_item = ItemData(
         type=item_type,
         description=description,
         color=color,
         lost_found_date=normalize_datetime(lost_found_date),
-        is_item_with_finder=False,
+        is_item_with_finder=is_finder,
         location_name=clean_text(location_name),
     )
 
-    found_reports = get_found_reports(await fetch_mapped_reports())
+    candidates = get_reports_by_kind(await fetch_mapped_reports(), not is_finder)
 
     return build_search_response(
-        selected_item=lost_item,
-        candidates=found_reports,
-        empty_message="لا توجد بلاغات أغراض موجودة متاحة للمقارنة حاليًا.",
+        selected_item=query_item,
+        candidates=candidates,
+        empty_message=(
+            "لا توجد بلاغات أغراض مفقودة متاحة للمقارنة حاليًا."
+            if is_finder
+            else "لا توجد بلاغات أغراض موجودة متاحة للمقارنة حاليًا."
+        ),
         extra_fields={
-            "analyzed_item": lost_item.model_dump(),
-            "report_kind": "lost",
-            "candidate_kind": "found",
+            "analyzed_item": query_item.model_dump(),
+            "report_kind": report_kind,
+            "candidate_kind": "lost" if is_finder else "found",
         },
     )
 
@@ -247,7 +295,9 @@ async def chat_search(
     message: str = Form(...),
     location_name: str | None = Form(None),
     lost_found_date: str | None = Form(None),
+    report_kind: str = Form("lost"),
 ):
+    is_finder = parse_report_kind(report_kind)
     cleaned_message = clean_text(message)
 
     if not cleaned_message:
@@ -293,24 +343,28 @@ async def chat_search(
             "decision": None,
         }
 
-    lost_item = ItemData(
+    query_item = ItemData(
         type=item_type,
         description=description,
         color=color,
         lost_found_date=normalize_datetime(lost_found_date),
-        is_item_with_finder=False,
+        is_item_with_finder=is_finder,
         location_name=clean_text(location_name) or clean_text(extracted_data.get("location")),
     )
 
-    found_reports = get_found_reports(await fetch_mapped_reports())
+    candidates = get_reports_by_kind(await fetch_mapped_reports(), not is_finder)
 
     return build_search_response(
-        selected_item=lost_item,
-        candidates=found_reports,
-        empty_message="لا توجد بلاغات أغراض موجودة متاحة للمقارنة حاليًا.",
+        selected_item=query_item,
+        candidates=candidates,
+        empty_message=(
+            "لا توجد بلاغات أغراض مفقودة متاحة للمقارنة حاليًا."
+            if is_finder
+            else "لا توجد بلاغات أغراض موجودة متاحة للمقارنة حاليًا."
+        ),
         extra_fields={
             "reply": extracted_data.get("reply"),
             "should_match": True,
-            "extracted_item": lost_item.model_dump(),
+            "extracted_item": query_item.model_dump(),
         },
     )
