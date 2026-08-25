@@ -66,16 +66,24 @@ COLOR_ALIASES = {
 
 KNOWN_TYPES = set(TYPE_ALIASES.values())
 
+# Measured on text-embedding-3-small: unrelated short item phrases sit
+# around 0.20-0.47 cosine similarity depending on how much context they
+# carry, genuine same-item paraphrases land around 0.39-0.9+. There is no
+# single cutoff that cleanly separates the two - bare category words are
+# just noisy ("stylus" vs "spoon" can score higher than "stylus" vs "apple
+# pencil"). So a lower floor is used once a structured field (color or
+# location) is already confirmed, trusting the semantic signal more when
+# there's real corroboration and less when there's none at all.
+SEMANTIC_FLOOR = 0.50
+SEMANTIC_FLOOR_SUPPORTED = 0.40
 
-SIM_CEIL = 0.55
+# type + color + location, type + one of them, type alone.
+TYPE_MATCH_SCORES = (75.0, 90.0, 100.0)
 
-
-TYPE_MATCH_BASE = 75.0
-TYPE_UNKNOWN_BASE = 40.0
-TYPE_CONFLICT_BASE = 10.0
-FIELD_BONUS = 15.0
-DESC_BONUS_MAX = 20.0
+CONFLICT_BASE = 10.0
 CONFLICT_CEILING = 35.0
+FALLBACK_FIELD_BONUS = 15.0
+FALLBACK_CEILING = 74.0
 
 
 def normalize_text(value: Any) -> str:
@@ -114,9 +122,18 @@ def normalize_color(value: Any) -> str:
 
 
 def semantic_text(item: ItemData) -> str:
-    """Description is the richest signal; fall back to type when it's the
-    only text available (e.g. an open-vocabulary type with no description)."""
-    return normalize_text(item.description) or normalize_type(item.type)
+    """Description is the richest signal. Without one, fall back to color +
+    type: a bare type word alone ("stylus") is too sparse for embeddings to
+    reliably judge relatedness against another bare word ("apple pencil"),
+    but pairing it with color ("white stylus" vs "white apple pencil")
+    gives enough context to separate genuinely-same objects from
+    genuinely-different ones."""
+    description = normalize_text(item.description)
+
+    if description:
+        return description
+
+    return " ".join(part for part in (normalize_color(item.color), normalize_type(item.type)) if part)
 
 
 def cosine_similarity(first: list[float], second: list[float]) -> float:
@@ -136,12 +153,20 @@ def cosine_similarity(first: list[float], second: list[float]) -> float:
 def field_score(value_a: str, value_b: str, known: set[str] | None = None, fuzzy: bool = False) -> float | None:
     """1.0 = agreement, 0.0 = confirmed conflict, None = evidence unavailable
     (a value is missing, or an open-vocabulary mismatch we can't confidently
-    call a conflict)."""
+    call a conflict). fuzzy=True treats one side's words as a subset of the
+    other's as agreement too - handles word-order variants ("مول العثيم" vs
+    "العثيم مول") and specificity variants ("sony" vs "sony playstation")."""
     if not value_a or not value_b:
         return None
 
-    if value_a == value_b or (fuzzy and (value_a in value_b or value_b in value_a)):
+    if value_a == value_b:
         return 1.0
+
+    if fuzzy:
+        words_a, words_b = set(value_a.split()), set(value_b.split())
+
+        if words_a <= words_b or words_b <= words_a:
+            return 1.0
 
     if known is None or (value_a in known and value_b in known):
         return 0.0
@@ -154,31 +179,35 @@ def calculate_match_score(
     second_item: ItemData,
     semantic_similarity: float,
 ) -> tuple[float, dict[str, float | None]]:
-    type_score = field_score(normalize_type(first_item.type), normalize_type(second_item.type), KNOWN_TYPES)
+    type_score = field_score(
+        normalize_type(first_item.type), normalize_type(second_item.type), KNOWN_TYPES, fuzzy=True
+    )
     color_score = field_score(normalize_color(first_item.color), normalize_color(second_item.color))
     location_score = field_score(
         normalize_text(first_item.location_name), normalize_text(second_item.location_name), fuzzy=True
     )
 
-    has_description = bool(normalize_text(first_item.description)) and bool(normalize_text(second_item.description))
-    desc_similarity = max(0.0, min((semantic_similarity - SIM_FLOOR) / (SIM_CEIL - SIM_FLOOR), 1.0))
+    # A type that couldn't be confirmed by text alone may still be the same
+    # object worded differently ("apple pencil" vs "stylus"). Trust a lower
+    # semantic bar once a structured field is already confirmed matching -
+    # that corroboration makes a moderate semantic signal more meaningful.
+    supported = color_score == 1.0 or location_score == 1.0
+    floor = SEMANTIC_FLOOR_SUPPORTED if supported else SEMANTIC_FLOOR
 
-    evidence = {
-        "type": type_score,
-        "color": color_score,
-        "location": location_score,
-        "description": desc_similarity if has_description else None,
-    }
+    if type_score is None and semantic_similarity >= floor:
+        type_score = 1.0
 
-    desc_bonus = desc_similarity * DESC_BONUS_MAX if has_description else 0.0
+    evidence = {"type": type_score, "color": color_score, "location": location_score, "semantic": semantic_similarity}
 
     if type_score == 0.0:
-
-        score = round(min(TYPE_CONFLICT_BASE + desc_bonus, CONFLICT_CEILING), 2)
+        # A confirmed type conflict is disqualifying: color/location are
+        # deliberately ignored so a matching color can never rescue it.
+        score = round(min(CONFLICT_BASE + max(0.0, semantic_similarity) * 25, CONFLICT_CEILING), 2)
+    elif type_score == 1.0:
+        score = TYPE_MATCH_SCORES[(color_score == 1.0) + (location_score == 1.0)]
     else:
-        base = TYPE_MATCH_BASE if type_score == 1.0 else TYPE_UNKNOWN_BASE
-        bonus = (FIELD_BONUS if color_score == 1.0 else 0.0) + (FIELD_BONUS if location_score == 1.0 else 0.0)
-        score = round(min(base + bonus + desc_bonus, 100.0), 2)
+        support = FALLBACK_FIELD_BONUS * ((color_score == 1.0) + (location_score == 1.0))
+        score = round(min(support + max(0.0, semantic_similarity) * 40, FALLBACK_CEILING), 2)
 
     return score, evidence
 
@@ -199,13 +228,8 @@ def build_match_reason(evidence: dict[str, float | None]) -> str:
     elif evidence["location"] == 0.0:
         reasons.append("الموقع مختلف")
 
-    description = evidence["description"]
-
-    if description is not None:
-        if description >= 0.75:
-            reasons.append("تشابه دلالي مرتفع جدًا في الوصف")
-        elif description >= 0.45:
-            reasons.append("تشابه دلالي في الوصف")
+    if evidence["type"] != 1.0 and evidence["semantic"] >= 0.45:
+        reasons.append("تشابه دلالي في الوصف")
 
     return "، ".join(reasons) if reasons else "لا توجد مؤشرات تطابق كافية"
 
@@ -251,20 +275,20 @@ def find_matches(lost_item: ItemData, found_items: list[ItemData]) -> list[Match
         score, evidence = calculate_match_score(lost_item, candidate, semantic_similarity)
         lost_report_id, found_report_id = resolve_report_ids(lost_item, candidate)
 
-        results.append(
-            MatchResult(
-                lost_report_id=lost_report_id,
-                found_report_id=found_report_id or "",
-                similarity_score=score,
-                match_reason=build_match_reason(evidence),
-                status=classify_match(score)["status"],
-            )
+        match = MatchResult(
+            lost_report_id=lost_report_id,
+            found_report_id=found_report_id or "",
+            similarity_score=score,
+            match_reason=build_match_reason(evidence),
+            status=classify_match(score)["status"],
         )
+        results.append((score, semantic_similarity, match))
 
-    results.sort(key=lambda result: result.similarity_score, reverse=True)
-    relevant = [result for result in results if result.similarity_score >= RELEVANT_SCORE_FLOOR]
+    # Ties on structured evidence are broken by raw semantic similarity.
+    results.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    relevant = [match for score, _, match in results if score >= RELEVANT_SCORE_FLOOR]
 
-    return (relevant or results[:1])[:MAX_MATCH_RESULTS]
+    return (relevant or [results[0][2]])[:MAX_MATCH_RESULTS]
 
 
 def classify_match(score: float) -> dict:

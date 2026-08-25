@@ -116,8 +116,9 @@ Matching rules:
 Examples (User -> Output):
 
 "السلام عليكم" -> {"reply": "وعليكم السلام! صف لي الغرض المفقود وسأساعدك في البحث عنه.", "should_match": false, "type": null, "description": null, "color": null, "location": null}
-"فقدت محفظة" -> {"reply": "وش لون المحفظة واين فقدتها, "should_match": false, "type": "wallet", "description": null, "color": null, "location": null}
+"فقدت محفظة" -> {"reply": "وش لون المحفظة ووين تقريبًا فقدتها؟", "should_match": false, "type": "wallet", "description": null, "color": null, "location": null}
 "فقدت محفظة زرقاء صغيرة" -> {"reply": "تمام، وين تقريبًا فقدت المحفظة؟", "should_match": false, "type": "wallet", "description": "small blue wallet", "color": "blue", "location": null}
+"فقدت سلسال ذهبي" -> {"reply": "تمام، وين تقريبًا فقدت السلسال؟", "should_match": false, "type": "necklace", "description": "gold necklace", "color": "gold", "location": null}
 "فقدت محفظة في جدة بارك" -> {"reply": "وش لون المحفظة؟", "should_match": false, "type": "wallet", "description": null, "color": null, "location": "جدة بارك"}
 "فقدت محفظة زرقاء صغيرة في جدة بارك" -> {"reply": "فهمت، سأستخدم وصف المحفظة للبحث عن بلاغات مشابهة.", "should_match": true, "type": "wallet", "description": "small blue wallet", "color": "blue", "location": "جدة بارك"}
 "فقدت كوب في جدة بارك بس ما أتذكر لونه بالضبط" -> {"reply": "تمام، بأبحث عن الكوب باستخدام المعلومات المتوفرة.", "should_match": true, "type": "mug", "description": null, "color": null, "location": "جدة بارك"}
