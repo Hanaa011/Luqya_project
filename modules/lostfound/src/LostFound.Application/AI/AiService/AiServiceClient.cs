@@ -26,8 +26,10 @@ namespace LostFound.AI.AiService
             _httpClient.Timeout = TimeSpan.FromSeconds(options.Value.TimeoutSeconds);
         }
 
-        public Task<List<AiServiceMatch>> SearchTextAsync(
-            string text, string? locationName, bool isFinder, CancellationToken cancellationToken = default)
+        public Task<AiServiceSearchResult> SearchTextAsync(
+            string text, string? locationName, bool isFinder,
+            (string? Type, string? Description, string? Color, string? Location) knownContext,
+            CancellationToken cancellationToken = default)
         {
             return ResilientProviderDecorator.ExecuteAsync(
                 async ct =>
@@ -41,17 +43,19 @@ namespace LostFound.AI.AiService
                     {
                         content.Add(new StringContent(locationName), "location_name");
                     }
+                    AddKnownContext(content, knownContext);
 
                     var response = await PostAsync("api/ai/chat-search", content, ct);
-                    return response.Matches ?? new List<AiServiceMatch>();
+                    return ToSearchResult(response);
                 },
                 "ai_service chat-search",
                 _logger,
                 cancellationToken);
         }
 
-        public Task<List<AiServiceMatch>> SearchImageAsync(
+        public Task<AiServiceSearchResult> SearchImageAsync(
             byte[] imageBytes, string mimeType, string? text, string? locationName, bool isFinder,
+            (string? Type, string? Description, string? Color, string? Location) knownContext,
             CancellationToken cancellationToken = default)
         {
             return ResilientProviderDecorator.ExecuteAsync(
@@ -70,9 +74,10 @@ namespace LostFound.AI.AiService
                     {
                         content.Add(new StringContent(locationName), "location_name");
                     }
+                    AddKnownContext(content, knownContext);
 
                     var response = await PostAsync("api/ai/match-image", content, ct);
-                    return response.Matches ?? new List<AiServiceMatch>();
+                    return ToSearchResult(response);
                 },
                 "ai_service match-image",
                 _logger,
@@ -103,6 +108,40 @@ namespace LostFound.AI.AiService
                 cancellationToken);
         }
 
+        private static void AddKnownContext(
+            MultipartFormDataContent content,
+            (string? Type, string? Description, string? Color, string? Location) knownContext)
+        {
+            if (!string.IsNullOrWhiteSpace(knownContext.Type))
+            {
+                content.Add(new StringContent(knownContext.Type), "context_type");
+            }
+            if (!string.IsNullOrWhiteSpace(knownContext.Description))
+            {
+                content.Add(new StringContent(knownContext.Description), "context_description");
+            }
+            if (!string.IsNullOrWhiteSpace(knownContext.Color))
+            {
+                content.Add(new StringContent(knownContext.Color), "context_color");
+            }
+            if (!string.IsNullOrWhiteSpace(knownContext.Location))
+            {
+                content.Add(new StringContent(knownContext.Location), "context_location");
+            }
+        }
+
+        private static AiServiceSearchResult ToSearchResult(AiSearchResponseBody body) => new()
+        {
+            Reply = body.Reply,
+            ShouldMatch = body.ShouldMatch,
+            ExtractedType = body.ExtractedItem?.Type,
+            ExtractedDescription = body.ExtractedItem?.Description,
+            ExtractedColor = body.ExtractedItem?.Color,
+            ExtractedLocation = body.ExtractedItem?.Location,
+            FollowUpPrompt = body.FollowUpPrompt,
+            Matches = body.Matches ?? new List<AiServiceMatch>(),
+        };
+
         private async Task<AiSearchResponseBody> PostAsync(string path, HttpContent content, CancellationToken cancellationToken)
         {
             using var httpResponse = await _httpClient.PostAsync(path, content, cancellationToken);
@@ -126,12 +165,37 @@ namespace LostFound.AI.AiService
             return imageContent;
         }
 
-        // Only the fields this client actually reads - ai_service's response
-        // carries more (reply/extracted_item/decision/etc.), never needed here.
         private class AiSearchResponseBody
         {
+            [JsonPropertyName("reply")]
+            public string? Reply { get; set; }
+
+            [JsonPropertyName("should_match")]
+            public bool ShouldMatch { get; set; }
+
+            [JsonPropertyName("extracted_item")]
+            public ExtractedItemBody? ExtractedItem { get; set; }
+
+            [JsonPropertyName("follow_up_prompt")]
+            public string? FollowUpPrompt { get; set; }
+
             [JsonPropertyName("matches")]
             public List<AiServiceMatch>? Matches { get; set; }
+        }
+
+        private class ExtractedItemBody
+        {
+            [JsonPropertyName("type")]
+            public string? Type { get; set; }
+
+            [JsonPropertyName("description")]
+            public string? Description { get; set; }
+
+            [JsonPropertyName("color")]
+            public string? Color { get; set; }
+
+            [JsonPropertyName("location")]
+            public string? Location { get; set; }
         }
     }
 }

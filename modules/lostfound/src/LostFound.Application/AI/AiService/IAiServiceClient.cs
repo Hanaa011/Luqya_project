@@ -16,11 +16,17 @@ namespace LostFound.AI.AiService
         // isFinder: false = the searcher lost an item (candidates are found
         // reports), true = the searcher found an item (candidates are lost
         // reports) - maps directly to ai_service's report_kind form field.
-        Task<List<AiServiceMatch>> SearchTextAsync(
-            string text, string? locationName, bool isFinder, CancellationToken cancellationToken = default);
+        // knownContext: the previous turn's extracted fields, echoed back so
+        // ai_service can combine them with this message/image in one call -
+        // each element is a single concise current value, never history.
+        Task<AiServiceSearchResult> SearchTextAsync(
+            string text, string? locationName, bool isFinder,
+            (string? Type, string? Description, string? Color, string? Location) knownContext,
+            CancellationToken cancellationToken = default);
 
-        Task<List<AiServiceMatch>> SearchImageAsync(
+        Task<AiServiceSearchResult> SearchImageAsync(
             byte[] imageBytes, string mimeType, string? text, string? locationName, bool isFinder,
+            (string? Type, string? Description, string? Color, string? Location) knownContext,
             CancellationToken cancellationToken = default);
 
         // Analysis only - never calls ai_service's matching logic.
@@ -41,6 +47,24 @@ namespace LostFound.AI.AiService
 
         [JsonPropertyName("match_reason")]
         public string? MatchReason { get; set; }
+    }
+
+    // Conversational metadata alongside matches - Reply/ShouldMatch let the
+    // caller distinguish a reply-only turn (greeting, incomplete
+    // description) from a turn that actually searched; ExtractedX is the
+    // compact "known so far" state the caller echoes back as the next
+    // call's knownContext. FollowUpPrompt may be set together with a
+    // non-empty Matches list - it never gates or blocks them.
+    public class AiServiceSearchResult
+    {
+        public string? Reply { get; set; }
+        public bool ShouldMatch { get; set; }
+        public string? ExtractedType { get; set; }
+        public string? ExtractedDescription { get; set; }
+        public string? ExtractedColor { get; set; }
+        public string? ExtractedLocation { get; set; }
+        public string? FollowUpPrompt { get; set; }
+        public List<AiServiceMatch> Matches { get; set; } = new();
     }
 
     public class AiImageAnalysisResult

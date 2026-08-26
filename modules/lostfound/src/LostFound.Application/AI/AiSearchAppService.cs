@@ -48,7 +48,7 @@ namespace LostFound.AI
             _logger.LogInformation("========== AiSearchAppService Created ==========");
         }
 
-        public async Task<List<AiSearchResultDto>> SearchAsync(AiSearchInputDto input)
+        public async Task<AiSearchResponseDto> SearchAsync(AiSearchInputDto input)
         {
             _logger.LogInformation("========== SearchAsync Started ==========");
 
@@ -87,13 +87,15 @@ namespace LostFound.AI
                 }
             }
 
-            List<AiSearchResultDto>? dto = null;
+            AiSearchResponseDto? response = null;
 
             try
             {
                 _logger.LogInformation("Calling ai_service (primary) via IAiServiceClient...");
-                dto = await SearchWithAiServiceAsync(input.Text, imageBytes, input.Type, input.MaxResults);
-                _logger.LogInformation("ai_service returned {Count} result(s) after enrichment/filtering.", dto.Count);
+                response = await SearchWithAiServiceAsync(input, imageBytes);
+                _logger.LogInformation(
+                    "ai_service returned ShouldMatch={ShouldMatch}, {Count} result(s) after enrichment/filtering.",
+                    response.ShouldMatch, response.Results.Count);
             }
             catch (UserFriendlyException)
             {
@@ -113,7 +115,7 @@ namespace LostFound.AI
                     "ai_service search failed; falling back to the existing AiMatchingService implementation.");
             }
 
-            if (dto == null)
+            if (response == null)
             {
                 _logger.LogInformation("Calling IAiMatchingService.FindSimilarReportsAsync (fallback)...");
 
@@ -129,21 +131,28 @@ namespace LostFound.AI
 
                 results = ApplyConfidenceFloor(results);
 
-                dto = results.Select(r => new AiSearchResultDto
+                // The fallback has no conversational layer - it always
+                // searched, so ShouldMatch is unconditionally true and there
+                // is no Reply/ExtractedItem/FollowUpPrompt to carry.
+                response = new AiSearchResponseDto
                 {
-                    ReportId = r.ReportId,
-                    Description = r.Description,
-                    Color = r.Color,
-                    AiObjectType = r.AiObjectType,
-                    Type = r.Type,
-                    ImagePath = r.ImagePath,
-                    ScorePercentage = r.ScorePercentage,
-                    MatchReasons = r.MatchReasons,
-                    MatchExplanation = r.MatchExplanation
-                }).ToList();
+                    ShouldMatch = true,
+                    Results = results.Select(r => new AiSearchResultDto
+                    {
+                        ReportId = r.ReportId,
+                        Description = r.Description,
+                        Color = r.Color,
+                        AiObjectType = r.AiObjectType,
+                        Type = r.Type,
+                        ImagePath = r.ImagePath,
+                        ScorePercentage = r.ScorePercentage,
+                        MatchReasons = r.MatchReasons,
+                        MatchExplanation = r.MatchExplanation
+                    }).ToList()
+                };
             }
 
-            foreach (var result in dto)
+            foreach (var result in response.Results)
             {
                 _logger.LogInformation(
                     "ReportId: {Id} | Score: {Score}% | Description: {Description}",
@@ -152,52 +161,79 @@ namespace LostFound.AI
                     result.Description);
             }
 
-            _logger.LogInformation("Returning {Count} DTO(s).", dto.Count);
+            _logger.LogInformation("Returning {Count} result(s), ShouldMatch={ShouldMatch}.", response.Results.Count, response.ShouldMatch);
             _logger.LogInformation("========== SearchAsync Finished ==========");
 
-            return dto;
+            return response;
         }
 
         /// <summary>
         /// Primary search path. ai_service always searches ONE direction per
         /// call (candidates opposite the query's own kind) - when
-        /// <paramref name="type"/> doesn't pin a single direction, both
-        /// directions are queried and merged, so "search everything" still
-        /// covers Lost and Found candidates exactly like the existing
-        /// implementation does.
+        /// <paramref name="input"/>.Type doesn't pin a single direction, both
+        /// directions are queried concurrently and merged, so "search
+        /// everything" still covers Lost and Found candidates exactly like
+        /// the existing implementation does. Reply/ShouldMatch/ExtractedItem/
+        /// FollowUpPrompt are direction-independent (same message/image
+        /// produced them), so only the first direction's copy is kept; only
+        /// the match lists themselves are combined.
         /// </summary>
-        private async Task<List<AiSearchResultDto>> SearchWithAiServiceAsync(
-            string? text, byte[]? imageBytes, ReportType? type, int maxResults)
+        private async Task<AiSearchResponseDto> SearchWithAiServiceAsync(AiSearchInputDto input, byte[]? imageBytes)
         {
-            var searcherIsFinderDirections = type switch
+            var searcherIsFinderDirections = input.Type switch
             {
                 ReportType.Found => new[] { false }, // searcher lost it -> candidates are Found reports
                 ReportType.Lost => new[] { true },   // searcher found it -> candidates are Lost reports
                 _ => new[] { false, true },
             };
 
-            var matches = new List<AiServiceMatch>();
+            var knownContext = (input.ContextType, input.ContextDescription, input.ContextColor, input.ContextLocation);
 
-            foreach (var searcherIsFinder in searcherIsFinderDirections)
+            var directionTasks = searcherIsFinderDirections
+                .Select(searcherIsFinder => imageBytes != null
+                    ? _aiServiceClient.SearchImageAsync(
+                        imageBytes, ImageMimeTypeResolver.Resolve(imageBytes), input.Text, locationName: null, searcherIsFinder, knownContext)
+                    : _aiServiceClient.SearchTextAsync(input.Text!, locationName: null, searcherIsFinder, knownContext))
+                .ToArray();
+
+            var directionResults = await Task.WhenAll(directionTasks);
+            var primary = directionResults[0];
+
+            var response = new AiSearchResponseDto
             {
-                var directionMatches = imageBytes != null
-                    ? await _aiServiceClient.SearchImageAsync(
-                        imageBytes, ImageMimeTypeResolver.Resolve(imageBytes), text, locationName: null, searcherIsFinder)
-                    : await _aiServiceClient.SearchTextAsync(text!, locationName: null, searcherIsFinder);
+                Reply = primary.Reply,
+                ShouldMatch = primary.ShouldMatch,
+                ExtractedType = primary.ExtractedType,
+                ExtractedDescription = primary.ExtractedDescription,
+                ExtractedColor = primary.ExtractedColor,
+                ExtractedLocation = primary.ExtractedLocation,
+                FollowUpPrompt = primary.FollowUpPrompt,
+            };
 
-                matches.AddRange(directionMatches);
+            if (!primary.ShouldMatch)
+            {
+                // Reply-only turn (greeting / incomplete description) - never
+                // fetch candidates or run matching for it.
+                return response;
             }
 
-            return await EnrichAsync(matches, type, maxResults);
+            var allMatches = directionResults.SelectMany(r => r.Matches).ToList();
+            response.Results = await EnrichAsync(allMatches, input.Type, input.MaxResults);
+
+            return response;
         }
 
         /// <summary>
         /// ai_service's match results only carry the candidate's report id,
         /// score, and reason (see AiServiceMatch) - not its Description/Color/
         /// AiObjectType/ImagePath. This looks each candidate up against the
-        /// same searchable-reports set AiMatchingService already reads from,
-        /// so the response DTO is fully populated without ai_service ever
-        /// needing to know about those fields itself.
+        /// same candidate pool ai_service itself searched
+        /// (IReportRepository.GetReportsByTypeAsync - every report of the
+        /// given type, regardless of whether its legacy EmbeddingJson has
+        /// been computed yet), so the response DTO is fully populated
+        /// without ai_service ever needing to know about those fields
+        /// itself, and without silently dropping a genuine match just
+        /// because the old embedding background job hasn't caught up.
         /// </summary>
         private async Task<List<AiSearchResultDto>> EnrichAsync(
             List<AiServiceMatch> matches, ReportType? type, int maxResults)
@@ -207,7 +243,7 @@ namespace LostFound.AI
                 return new List<AiSearchResultDto>();
             }
 
-            var candidateReports = await _reportRepository.GetSearchableReportsAsync(type);
+            var candidateReports = await _reportRepository.GetReportsByTypeAsync(type);
             var reportsById = candidateReports.ToDictionary(r => r.Id);
 
             var dto = new List<AiSearchResultDto>();

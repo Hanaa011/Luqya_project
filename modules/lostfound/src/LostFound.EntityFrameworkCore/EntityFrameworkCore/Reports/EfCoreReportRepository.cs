@@ -49,5 +49,14 @@ namespace LostFound.Reports
 
             return await queryable.ToListAsync();
         }
+
+        public async Task<List<Report>> GetReportsByTypeAsync(ReportType? type)
+        {
+            var dbSet = await GetDbSetAsync();
+
+            var queryable = type.HasValue ? dbSet.Where(r => r.Type == type.Value) : dbSet;
+
+            return await queryable.ToListAsync();
+        }
     }
 }

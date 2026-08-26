@@ -17,5 +17,16 @@ namespace LostFound.Reports
         // Used by AiSearchAppService - never regenerates embeddings, only
         // reads what is already stored.
         Task<List<Report>> GetSearchableReportsAsync(ReportType? type);
+
+        // Used by AiSearchAppService.EnrichAsync to look up ai_service's own
+        // match results. Deliberately NOT restricted to EmbeddingJson != null
+        // like GetSearchableReportsAsync - that requirement is specific to
+        // the legacy AiMatchingService/HybridSearchEngine consumer, which
+        // scores from a precomputed embedding. ai_service computes its own
+        // embeddings live and reads its candidate pool from every report of
+        // the given type regardless of EmbeddingJson, so this mirrors that
+        // same pool to avoid silently dropping a real match during
+        // enrichment just because the background embedding job hasn't run.
+        Task<List<Report>> GetReportsByTypeAsync(ReportType? type);
     }
 }

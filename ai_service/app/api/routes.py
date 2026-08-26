@@ -88,6 +88,41 @@ def parse_report_kind(report_kind: str) -> bool:
     return report_kind == "found"
 
 
+def build_known_context(
+    context_type: str | None,
+    context_description: str | None,
+    context_color: str | None,
+    context_location: str | None,
+) -> dict | None:
+    known_context = {
+        "type": clean_text(context_type),
+        "description": clean_text(context_description),
+        "color": clean_text(context_color),
+        "location": clean_text(context_location),
+    }
+    return known_context if any(known_context.values()) else None
+
+
+def merge_known_context(
+    item_type: str | None,
+    description: str | None,
+    color: str | None,
+    location: str | None,
+    known_context: dict | None,
+) -> tuple[str | None, str | None, str | None, str | None]:
+    if not known_context:
+        return item_type, description, color, location
+
+    # Fallback only, never concatenated - matches chat_service.py's own
+    # merge so a description never grows across turns either way.
+    return (
+        item_type or known_context.get("type"),
+        description or known_context.get("description"),
+        color or known_context.get("color"),
+        location or known_context.get("location"),
+    )
+
+
 def run_image_analysis(image: UploadFile, image_bytes: bytes) -> dict:
     try:
         return analyze_item_image(image_bytes=image_bytes, mime_type=image.content_type)
@@ -239,6 +274,10 @@ async def match_image(
     location_name: str | None = Form(None),
     lost_found_date: str | None = Form(None),
     report_kind: str = Form("lost"),
+    context_type: str | None = Form(None),
+    context_description: str | None = Form(None),
+    context_color: str | None = Form(None),
+    context_location: str | None = Form(None),
 ):
     is_finder = parse_report_kind(report_kind)
 
@@ -260,8 +299,32 @@ async def match_image(
     if message_text:
         description = f"{description}. {message_text}" if description else message_text
 
+    known_context = build_known_context(
+        context_type, context_description, context_color, context_location
+    )
+    item_type, description, color, location_name = merge_known_context(
+        item_type, description, color, clean_text(location_name), known_context
+    )
+
+    extracted_item = {
+        "type": item_type,
+        "description": description,
+        "color": color,
+        "location": location_name,
+    }
+
     if not item_type and not description:
-        raise HTTPException(status_code=422, detail="The image does not contain a clearly identifiable item.")
+        return {
+            "reply": "لم أتمكن من تمييز الغرض بوضوح في الصورة. هل يمكنك وصفه بكلمات؟",
+            "should_match": False,
+            "extracted_item": extracted_item,
+            "follow_up_prompt": None,
+            "report_kind": report_kind,
+            "candidate_count": 0,
+            "matches": [],
+            "best_match": None,
+            "decision": None,
+        }
 
     query_item = ItemData(
         type=item_type,
@@ -269,10 +332,19 @@ async def match_image(
         color=color,
         lost_found_date=normalize_datetime(lost_found_date),
         is_item_with_finder=is_finder,
-        location_name=clean_text(location_name),
+        location_name=location_name,
     )
 
     candidates = get_reports_by_kind(await fetch_mapped_reports(), not is_finder)
+
+    # Location never gates matching (Task: image search UX) - it only makes
+    # the results more precise, so it's offered as an optional refinement
+    # alongside whatever results already came back, never instead of them.
+    follow_up_prompt = (
+        None
+        if location_name
+        else "تم العثور على نتائج بناءً على الصورة. هل يمكنك إضافة الموقع لتحسين النتائج؟"
+    )
 
     return build_search_response(
         selected_item=query_item,
@@ -283,6 +355,10 @@ async def match_image(
             else "لا توجد بلاغات أغراض موجودة متاحة للمقارنة حاليًا."
         ),
         extra_fields={
+            "reply": None,
+            "should_match": True,
+            "extracted_item": extracted_item,
+            "follow_up_prompt": follow_up_prompt,
             "analyzed_item": query_item.model_dump(),
             "report_kind": report_kind,
             "candidate_kind": "lost" if is_finder else "found",
@@ -296,6 +372,10 @@ async def chat_search(
     location_name: str | None = Form(None),
     lost_found_date: str | None = Form(None),
     report_kind: str = Form("lost"),
+    context_type: str | None = Form(None),
+    context_description: str | None = Form(None),
+    context_color: str | None = Form(None),
+    context_location: str | None = Form(None),
 ):
     is_finder = parse_report_kind(report_kind)
     cleaned_message = clean_text(message)
@@ -303,8 +383,12 @@ async def chat_search(
     if not cleaned_message:
         raise HTTPException(status_code=400, detail="Message is required.")
 
+    known_context = build_known_context(
+        context_type, context_description, context_color, context_location
+    )
+
     try:
-        extracted_data = extract_item_from_message(cleaned_message)
+        extracted_data = extract_item_from_message(cleaned_message, known_context)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=502, detail="AI returned invalid chat extraction data.") from exc
     except ValueError as exc:
@@ -322,6 +406,7 @@ async def chat_search(
                 "color": extracted_data.get("color"),
                 "location": extracted_data.get("location"),
             },
+            "follow_up_prompt": None,
             "candidate_count": 0,
             "matches": [],
             "best_match": None,
@@ -331,12 +416,14 @@ async def chat_search(
     item_type = clean_text(extracted_data.get("type"))
     description = clean_text(extracted_data.get("description"))
     color = clean_text(extracted_data.get("color"))
+    location = clean_text(location_name) or clean_text(extracted_data.get("location"))
 
     if not item_type and not description:
         return {
             "reply": extracted_data.get("reply") or "فضلاً اذكري نوع الغرض أو وصفًا واضحًا له حتى أتمكن من البحث.",
             "should_match": False,
-            "extracted_item": {"type": item_type, "description": description, "color": color, "location": None},
+            "extracted_item": {"type": item_type, "description": description, "color": color, "location": location},
+            "follow_up_prompt": None,
             "candidate_count": 0,
             "matches": [],
             "best_match": None,
@@ -349,7 +436,7 @@ async def chat_search(
         color=color,
         lost_found_date=normalize_datetime(lost_found_date),
         is_item_with_finder=is_finder,
-        location_name=clean_text(location_name) or clean_text(extracted_data.get("location")),
+        location_name=location,
     )
 
     candidates = get_reports_by_kind(await fetch_mapped_reports(), not is_finder)
@@ -365,6 +452,7 @@ async def chat_search(
         extra_fields={
             "reply": extracted_data.get("reply"),
             "should_match": True,
-            "extracted_item": query_item.model_dump(),
+            "extracted_item": {"type": item_type, "description": description, "color": color, "location": location},
+            "follow_up_prompt": None,
         },
     )

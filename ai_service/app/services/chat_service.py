@@ -115,6 +115,12 @@ Matching rules:
 - The user may report an item they FOUND instead of lost (e.g. "وجدت",
   "لقيت", "I found", "I have found"). Treat this exactly like a lost-item
   report: apply the same extraction and completeness rules above.
+- The message may start with a line like "[Known so far: type=..., color=...,
+  location=...]" followed by the user's new message on the next line. That
+  line reflects details already confirmed earlier in the same conversation -
+  combine it with the new message into one extraction, exactly like
+  continuing an earlier exchange. Never treat the bracketed line itself as
+  something the user said.
 
 Examples (User -> Output):
 
@@ -154,7 +160,28 @@ RESPONSE_SCHEMA = {
 }
 
 
-def extract_item_from_message(message: str) -> dict:
+def _known_context_prefix(known_context: dict | None) -> str:
+    if not known_context:
+        return ""
+
+    parts = [
+        f"{key}={value}"
+        for key, value in (
+            ("type", known_context.get("type")),
+            ("color", known_context.get("color")),
+            ("location", known_context.get("location")),
+            ("description", known_context.get("description")),
+        )
+        if value
+    ]
+
+    if not parts:
+        return ""
+
+    return "[Known so far: " + ", ".join(parts) + "]\n"
+
+
+def extract_item_from_message(message: str, known_context: dict | None = None) -> dict:
     if not isinstance(message, str) or not message.strip():
         return {
             "reply": "اكتب لي وصف الغرض المفقود، مثل نوعه ولونه ومكان فقده إن أمكن.",
@@ -165,12 +192,14 @@ def extract_item_from_message(message: str) -> dict:
             "location": None,
         }
 
+    user_content = _known_context_prefix(known_context) + message.strip()
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": message.strip()},
+                {"role": "user", "content": user_content},
             ],
             response_format=RESPONSE_SCHEMA,
             temperature=0,
@@ -202,6 +231,16 @@ def extract_item_from_message(message: str) -> dict:
     description = clean_text(result.get("description"))
     color = clean_lower(result.get("color"))
     location = clean_text(result.get("location"))
+
+    if known_context:
+        # Fallback only - never concatenated. A field already extracted this
+        # turn always wins; the known value only fills a gap this turn left
+        # empty, so description stays a single concise current value instead
+        # of accumulating every prior turn's wording.
+        item_type = item_type or clean_lower(known_context.get("type"))
+        description = description or clean_text(known_context.get("description"))
+        color = color or clean_lower(known_context.get("color"))
+        location = location or clean_text(known_context.get("location"))
 
     should_match = result.get("should_match") is True
     has_meaningful_item_data = bool(item_type or (description and len(description) >= 3))
