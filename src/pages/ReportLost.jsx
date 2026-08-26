@@ -235,12 +235,15 @@ export default function ReportLost() {
       // point 4) - additive to, not a replacement for, the persisted
       // imagePath above. Searching within FOUND reports for something
       // matching what was lost.
-      let results = await aiSearch({
+      // aiSearch() now returns AiSearchResponseDto (results nested under
+      // `.results` alongside conversational fields this page doesn't use) —
+      // everything below still operates on a plain array exactly as before.
+      let results = (await aiSearch({
         text: description,
         imageBase64,
         type: ReportType.FOUND,
         maxResults: 6,
-      });
+      })).results ?? [];
 
       // Exclude the user's own reports from recovery candidates — only
       // when ownership can be verified via the real Report.CreatorId

@@ -58,6 +58,18 @@ export default function SmartSearch() {
   const [status, setStatus] = useState("idle"); // idle | loading | success | empty | error
   const [results, setResults] = useState([]);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // Conversational search (Task: preserve context across messages) - context
+  // is the previous turn's extracted {type, description, color, location} —
+  // a single concise current value each, echoed back on the next search so
+  // ai_service can combine it with the new message/image; it is never the
+  // full conversation text. history is the visible chat log (user turns +
+  // assistant replies/follow-up prompts) rendered inside the interaction
+  // box. Both live only in this component's state - no persistence, no
+  // server session, cleared on navigation away from the page.
+  const [context, setContext] = useState(null);
+  const [history, setHistory] = useState([]);
+
   const [ownReportsExcluded, setOwnReportsExcluded] = useState(0);
   // Phase 4 Part 4: mirrors ownReportsExcluded for the dismissed-pair
   // filter (Phase 4 Part 3) — see runSearch and the "empty" state render
@@ -131,6 +143,22 @@ export default function SmartSearch() {
     // and combined searches are all valid; only both-empty is rejected.
     if (!text.trim() && !imageFile) return;
 
+    // Render the user's own turn immediately, then clear the box for the
+    // next message — standard chat behavior (Task A: "clear the textarea
+    // after sending"). imageFile/text below still refer to what was just
+    // sent, since clearing only schedules the next render.
+    setHistory((prev) => [
+      ...prev,
+      {
+        role: "user",
+        text:
+          text.trim() ||
+          tr({ ar: "📷 صورة مرفقة", en: "📷 Attached image", ur: "📷 منسلک تصویر" }),
+      },
+    ]);
+    setText("");
+    handleImageFile(null);
+
     setStatus("loading");
     setErrorMsg(null);
     setOwnReportsExcluded(0);
@@ -152,9 +180,33 @@ export default function SmartSearch() {
         imageBase64,
         type: selected?.value,
         maxResults: 12,
+        context,
       });
 
-      let filtered = data ?? [];
+      // The assistant's turn in the chat log — reply covers the greeting/
+      // incomplete/complete-search cases, followUpPrompt covers the image-
+      // search "here are results, want to add a location?" case. The two
+      // are mutually exclusive today, but either one (never both being
+      // needed at once) must reach the log so a real reply is never hidden
+      // just because results happened to come back empty.
+      const assistantText = data.reply || data.followUpPrompt || null;
+      if (assistantText) {
+        setHistory((prev) => [...prev, { role: "assistant", text: assistantText }]);
+      }
+
+      // Only overwrite context when this turn actually extracted something —
+      // a bare greeting extracts nothing and must not wipe out an item
+      // already described in an earlier turn.
+      if (data.extractedType || data.extractedDescription || data.extractedColor || data.extractedLocation) {
+        setContext({
+          type: data.extractedType || null,
+          description: data.extractedDescription || null,
+          color: data.extractedColor || null,
+          location: data.extractedLocation || null,
+        });
+      }
+
+      let filtered = data.results ?? [];
 
       // Exclude the current user's own reports from recovery candidates —
       // only when ownership can be verified from real data. AiSearchResultDto
@@ -227,7 +279,12 @@ export default function SmartSearch() {
         setDismissedExcluded(dismissedCount);
       }
 
-      if (filtered.length > 0) {
+      if (!data.shouldMatch) {
+        // Reply-only turn (greeting or incomplete description) — no search
+        // ran, so this must never render as "no matching reports."
+        setResults([]);
+        setStatus("reply");
+      } else if (filtered.length > 0) {
         setResults(filtered);
         setStatus("success");
       } else {
@@ -255,6 +312,30 @@ export default function SmartSearch() {
         </div>
 
         <form onSubmit={runSearch} className="bg-card border border-border rounded-[2rem] p-6 lg:p-8 shadow-soft">
+          {/* Task A: conversation history rendered inside the existing
+              interaction box, above the input — user/assistant turns only,
+              client-side, cleared on navigation. Reuses the same colors
+              already used elsewhere on this page (primary for the button/
+              score badge, stone-100 for the filter pill track) — no new
+              design language. */}
+          {history.length > 0 && (
+            <div className="mb-4 space-y-3 max-h-80 overflow-y-auto">
+              {history.map((entry, index) => (
+                <div key={index} className={`flex ${entry.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                      entry.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-stone-100 text-foreground"
+                    }`}
+                  >
+                    {entry.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="relative">
             <textarea
               value={text}
@@ -347,7 +428,7 @@ export default function SmartSearch() {
                 ? imageFile
                   ? t("searchingByImageLabel")
                   : t("searchLoading")
-                : t("searchBtn")}
+                : tr({ ar: "إرسال", en: "Send", ur: "بھیجیں" })}
             </button>
           </div>
 
