@@ -6,6 +6,7 @@ import App from "./App";
 import { I18nProvider } from "./lib/i18n";
 import { ThemeProvider } from "./lib/theme";
 import { AuthProvider } from "./lib/auth";
+import { ConversationsProvider } from "./lib/conversationsContext";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
@@ -14,7 +15,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <ThemeProvider>
         <I18nProvider>
           <AuthProvider>
-            <App />
+            <ConversationsProvider>
+              <App />
+            </ConversationsProvider>
           </AuthProvider>
         </I18nProvider>
       </ThemeProvider>

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { NavLink, Link } from "react-router-dom";
-import { Sparkles, Sun, Moon, User, LogOut, LayoutDashboard, ListChecks } from "lucide-react";
+import { Sparkles, Sun, Moon, User, LogOut, LayoutDashboard, ListChecks, MessageSquare } from "lucide-react";
 
 // Full name if we have one, otherwise the identifier the person actually
 // recognizes as "them" — matches Nav.jsx's own AccountMenu so mobile and
@@ -33,7 +33,7 @@ const FOCUSABLE_SELECTOR =
  * there was never a slide-out/fade-out — there was nothing left to
  * animate by the time `open` became false.
  */
-export default function MobileMenu({ open, onClose, triggerRef, profile, onLogout, t, theme, toggleTheme }) {
+export default function MobileMenu({ open, onClose, triggerRef, profile, onLogout, t, theme, toggleTheme, messagesUnread = 0 }) {
   const panelRef = useRef(null);
 
   // Background scroll lock while the panel is open, restored the instant
@@ -161,6 +161,18 @@ export default function MobileMenu({ open, onClose, triggerRef, profile, onLogou
             <NavLink to="/dashboard" onClick={onClose} className={linkClass}>
               <LayoutDashboard className="size-4" />
               {t("navDashboard")}
+            </NavLink>
+          )}
+
+          {profile && (
+            <NavLink to="/messages" onClick={onClose} className={linkClass}>
+              <MessageSquare className="size-4" />
+              {t("navMessages")}
+              {messagesUnread > 0 && (
+                <span className="ms-auto inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold leading-none text-white">
+                  {messagesUnread > 9 ? "9+" : messagesUnread}
+                </span>
+              )}
             </NavLink>
           )}
         </nav>

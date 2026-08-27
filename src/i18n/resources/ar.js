@@ -66,6 +66,7 @@ export default {
   navReport: "بلّغ",
   navBrowse: "بلاغاتي",
   navDashboard: "لوحة التحكم",
+  navMessages: "الرسائل",
   navToggleTheme: "تبديل المظهر",
   navOpenMenu: "فتح القائمة",
   navCloseMenu: "إغلاق القائمة",

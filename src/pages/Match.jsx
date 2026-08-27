@@ -24,6 +24,7 @@ import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
 import { deleteReport, getReport, reportImageUrl, updateReport } from "../api/reports";
 import { acceptMatch, claimMatch, listMatches, rejectMatch } from "../api/matches";
+import { openConversation } from "../api/conversations";
 import { fetchMyReports } from "../lib/myReports";
 import { reportHeadingTitle } from "../lib/reportTitle";
 import {
@@ -119,6 +120,8 @@ export default function Match() {
   const navScore = location.state?.scorePercentage;
   const claimableScore = typeof navScore === "number" && Number.isFinite(navScore) ? navScore : null;
   const [claim, setClaim] = useState(null);
+  const [openingConversation, setOpeningConversation] = useState(false);
+  const [conversationError, setConversationError] = useState(null);
 
   useEffect(() => {
     document.title = "Report details — Luqya";
@@ -427,9 +430,28 @@ export default function Match() {
         // match in either party's Dashboard (there's no second report to
         // pair it with), unlike the full-Match path above it.
         setClaim({ action, status: "success", noOwnReport: !result?.match });
-        // Decision #2 (Phase 4 Part 3): Contact is immediately reachable -
-        // the pause is purely so the success state is visible, not a gate.
-        window.setTimeout(() => navigate(`/match/${report.id}/contact`), 900);
+        // Privacy-preserving communication: contact access no longer means
+        // a phone/email page - it opens (or reuses) a private in-platform
+        // conversation instead. The pause is purely so the success state
+        // is visible, not a gate.
+        window.setTimeout(async () => {
+          try {
+            const conversation = await openConversation(report.id);
+            navigate(`/messages/${conversation.id}`);
+          } catch (err) {
+            setClaim({
+              action,
+              status: "error",
+              error:
+                err.message ||
+                tr({
+                  ar: "تعذّر فتح المحادثة. حاول مرة أخرى.",
+                  en: "Couldn't open the conversation. Please try again.",
+                  ur: "بات چیت شروع نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+                }),
+            });
+          }
+        }, 900);
       } else {
         // Task B.2.5: unlike the old inline card (which just removed
         // itself from the results list), there's no list to remove this
@@ -450,6 +472,29 @@ export default function Match() {
             ur: "یہ عمل مکمل نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
           }),
       });
+    }
+  }
+
+  // The direct "Contact the owner/finder" action for an already-reviewed
+  // match (isReviewingMatch) - same destination as confirmClaim's success
+  // path, just without going through claimMatch again since access was
+  // already granted on an earlier visit.
+  async function openConversationAndGo() {
+    setOpeningConversation(true);
+    setConversationError(null);
+    try {
+      const conversation = await openConversation(report.id);
+      navigate(`/messages/${conversation.id}`);
+    } catch (err) {
+      setConversationError(
+        err.message ||
+          tr({
+            ar: "تعذّر فتح المحادثة. حاول مرة أخرى.",
+            en: "Couldn't open the conversation. Please try again.",
+            ur: "بات چیت شروع نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+          })
+      );
+      setOpeningConversation(false);
     }
   }
 
@@ -828,18 +873,29 @@ export default function Match() {
                         })}
                       </div>
                     ) : profile && isReviewingMatch ? (
-                      <Link
-                        to={`/match/${report.id}/contact`}
-                        className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                      >
-                        <span className="inline-flex items-center gap-3">
-                          <MessageCircle className="size-4" />
-                          {isLost
-                            ? copy(lang, { ar: "التواصل مع صاحب الغرض", en: "Contact the owner", ur: "مالک سے رابطہ کریں" })
-                            : copy(lang, { ar: "التواصل مع من عثر عليه", en: "Contact the finder", ur: "ملنے والے سے رابطہ کریں" })}
-                        </span>
-                        <ArrowRight className={`size-4 ${lang === "ar" || lang === "ur" ? "rotate-180" : ""}`} />
-                      </Link>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={openConversationAndGo}
+                          disabled={openingConversation}
+                          className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:pointer-events-none disabled:opacity-60"
+                        >
+                          <span className="inline-flex items-center gap-3">
+                            {openingConversation ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <MessageCircle className="size-4" />
+                            )}
+                            {isLost
+                              ? copy(lang, { ar: "التواصل مع صاحب الغرض", en: "Contact the owner", ur: "مالک سے رابطہ کریں" })
+                              : copy(lang, { ar: "التواصل مع من عثر عليه", en: "Contact the finder", ur: "ملنے والے سے رابطہ کریں" })}
+                          </span>
+                          <ArrowRight className={`size-4 ${lang === "ar" || lang === "ur" ? "rotate-180" : ""}`} />
+                        </button>
+                        {conversationError && (
+                          <p className="mt-2 text-xs text-error">{conversationError}</p>
+                        )}
+                      </div>
                     ) : !isReviewingMatch && claimableScore != null ? (
                       <ClaimAction
                         t={t}

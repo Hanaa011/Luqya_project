@@ -66,6 +66,7 @@ export default {
   navReport: "رپورٹ کریں",
   navBrowse: "میری رپورٹس",
   navDashboard: "ڈیش بورڈ",
+  navMessages: "پیغامات",
   navToggleTheme: "تھیم تبدیل کریں",
   navOpenMenu: "مینو کھولیں",
   navCloseMenu: "مینو بند کریں",

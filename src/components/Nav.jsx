@@ -3,7 +3,8 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useI18n } from "../lib/useI18n";
 import { useTheme } from "../lib/useTheme";
 import { useAuth } from "../lib/useAuth";
-import { Sparkles, Sun, Moon, User, LogOut, LayoutDashboard, ChevronDown, Menu } from "lucide-react";
+import { useConversations } from "../lib/useConversations";
+import { Sparkles, Sun, Moon, User, LogOut, LayoutDashboard, MessageSquare, ChevronDown, Menu } from "lucide-react";
 import Logo from "./Logo";
 import NotificationBell from "./NotificationBell";
 import LanguageSwitcher from "./LanguageSwitcher";
@@ -13,6 +14,7 @@ export default function Nav() {
   const { t } = useI18n();
   const { theme, toggleTheme } = useTheme();
   const { profile, logout } = useAuth();
+  const { totalUnread } = useConversations();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileMenuTriggerRef = useRef(null);
@@ -99,6 +101,25 @@ export default function Nav() {
                 }
               >
                 {t("navDashboard")}
+              </NavLink>
+            )}
+
+            {profile && (
+              <NavLink
+                to="/messages"
+                className={({ isActive }) =>
+                  `relative inline-flex items-center gap-1.5 ${
+                    isActive ? "text-primary" : "text-foreground/70 hover:text-primary transition-colors"
+                  }`
+                }
+              >
+                <MessageSquare className="size-3.5" />
+                {t("navMessages")}
+                {totalUnread > 0 && (
+                  <span className="inline-flex min-w-4 h-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold leading-none text-white">
+                    {totalUnread > 9 ? "9+" : totalUnread}
+                  </span>
+                )}
               </NavLink>
             )}
           </div>
@@ -194,6 +215,7 @@ export default function Nav() {
         t={t}
         theme={theme}
         toggleTheme={toggleTheme}
+        messagesUnread={totalUnread}
       />
     </nav>
   );

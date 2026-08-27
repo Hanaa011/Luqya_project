@@ -12,6 +12,41 @@ import { ReportType, MatchStatus } from "../api/enums";
 import { fetchMyReports } from "../lib/myReports";
 import { validateImageFile, ImageValidationReason } from "../lib/imageValidation";
 import { reportHeadingTitle } from "../lib/reportTitle";
+import { ApiError } from "../api/httpClient";
+
+// Task: never surface a raw backend/framework/network string (e.g. "401
+// Unauthorized", a .NET exception message, a bare fetch TypeError). 400s
+// stay as-is — those are ABP validation messages or UserFriendlyException
+// text, which is deliberately written to be shown to the end user (same
+// convention Match.jsx/Contact.jsx already use for that status code).
+// Everything else maps to a fixed, friendly, localized message instead of
+// whatever the server/network layer happened to say.
+function searchErrorMessage(err, tr) {
+  if (err instanceof ApiError) {
+    if (err.isUnauthorized) {
+      return tr({
+        ar: "انتهت صلاحية جلستك. الرجاء تسجيل الدخول مرة أخرى للمتابعة.",
+        en: "Your session has expired. Please log in again to continue.",
+        ur: "آپ کا سیشن ختم ہو گیا ہے۔ جاری رکھنے کے لیے دوبارہ لاگ ان کریں۔",
+      });
+    }
+    if (err.status === 400 && err.message) {
+      return err.message;
+    }
+    if (err.status === 0) {
+      return tr({
+        ar: "تعذّر الاتصال بالخادم. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
+        en: "Couldn't reach the server. Check your connection and try again.",
+        ur: "سرور تک رسائی نہیں ہو سکی۔ اپنا انٹرنیٹ کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      });
+    }
+  }
+  return tr({
+    ar: "حدث خطأ أثناء البحث. الرجاء المحاولة مرة أخرى.",
+    en: "Something went wrong while searching. Please try again.",
+    ur: "تلاش کے دوران خرابی پیش آئی۔ براہ کرم دوبارہ کوشش کریں۔",
+  });
+}
 
 // Task C: same message set as ReportLost.jsx/ReportFound.jsx — one rejection
 // reason always reads the same way anywhere images are picked in this app.
@@ -58,6 +93,7 @@ export default function SmartSearch() {
   const [status, setStatus] = useState("idle"); // idle | loading | success | empty | error
   const [results, setResults] = useState([]);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   // Conversational search (Task: preserve context across messages) - context
   // is the previous turn's extracted {type, description, color, location} —
@@ -97,6 +133,11 @@ export default function SmartSearch() {
   const [imageError, setImageError] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  // Task: Retry must safely repeat the same request. text/imageFile are
+  // already cleared by the time a response comes back (chat-style "clear
+  // the box after sending"), so the Retry button can't just re-invoke
+  // runSearch — it replays the exact params that were actually sent.
+  const lastRequestRef = useRef(null);
 
   useEffect(() => {
     document.title = tr({ ar: "البحث الذكي — لُقيا", en: "Smart search — Luqya", ur: "ذہین تلاش — لقیا" });
@@ -156,31 +197,59 @@ export default function SmartSearch() {
           tr({ ar: "📷 صورة مرفقة", en: "📷 Attached image", ur: "📷 منسلک تصویر" }),
       },
     ]);
+
+    const reqText = text.trim() || undefined;
+    const reqImageFile = imageFile;
+    const selected = TYPE_FILTERS.find((f) => f.key === typeFilter);
+    const reqContext = context;
+    const isImageOnly = Boolean(reqImageFile) && !reqText;
+
     setText("");
     handleImageFile(null);
 
+    // Verified request contract (AiSearchInputDto): Text and ImageBase64
+    // are independently optional, both go to the SAME POST
+    // api/app/ai-search/search endpoint / AiMatchingService scoring path
+    // that text-only search already used — no new/parallel endpoint (Task
+    // E2). Only send `type` when a specific one is selected —
+    // AiSearchInputDto.Type is nullable on the backend specifically so
+    // omitting it searches both.
+    const imageBase64 = reqImageFile ? await imageFileToBase64(reqImageFile) : undefined;
+    const requestArgs = {
+      text: reqText,
+      imageBase64,
+      type: selected?.value,
+      context: reqContext,
+      isImageOnly,
+    };
+    lastRequestRef.current = requestArgs;
+
+    await performSearch(requestArgs);
+  }
+
+  // Replays the exact last-submitted request — no new chat bubble (retry is
+  // not a new user message), no dependency on text/imageFile state (already
+  // cleared).
+  async function retrySearch() {
+    if (!lastRequestRef.current) return;
+    await performSearch(lastRequestRef.current);
+  }
+
+  async function performSearch({ text: reqText, imageBase64, type, context: reqContext, isImageOnly }) {
     setStatus("loading");
     setErrorMsg(null);
+    setSessionExpired(false);
     setOwnReportsExcluded(0);
     setDismissedExcluded(0);
-    setLastSearchWasImageOnly(Boolean(imageFile) && !text.trim());
+    setLastSearchWasImageOnly(isImageOnly);
 
     try {
-      // Verified request contract (AiSearchInputDto): Text and ImageBase64
-      // are independently optional, both go to the SAME POST
-      // api/app/ai-search/search endpoint / AiMatchingService scoring path
-      // that text-only search already used — no new/parallel endpoint (Task
-      // E2). Only send `type` when a specific one is selected —
-      // AiSearchInputDto.Type is nullable on the backend specifically so
-      // omitting it searches both.
-      const selected = TYPE_FILTERS.find((f) => f.key === typeFilter);
-      const imageBase64 = imageFile ? await imageFileToBase64(imageFile) : undefined;
       const data = await aiSearch({
-        text: text.trim() || undefined,
+        text: reqText,
         imageBase64,
-        type: selected?.value,
+        type,
         maxResults: 12,
-        context,
+        context: reqContext,
       });
 
       // The assistant's turn in the chat log — reply covers the greeting/
@@ -203,6 +272,17 @@ export default function SmartSearch() {
           description: data.extractedDescription || null,
           color: data.extractedColor || null,
           location: data.extractedLocation || null,
+          // Once a role ("lost"/"found") is confirmed by any turn, keep it
+          // for later turns that don't restate it (e.g. a bare "في المول")
+          // — the backend already resolves/falls back to this itself, this
+          // just carries that resolved value forward instead of dropping
+          // it if a later turn's response ever omits it.
+          reportKind: data.reportKind || reqContext?.reportKind || null,
+          // Same reasoning as reportKind - once the item's original-
+          // language name is known, keep using it verbatim rather than
+          // letting a later turn silently drop it (see search.js's remarks
+          // on why this affects match quality, not just wording).
+          itemNameLocal: data.itemNameLocal || reqContext?.itemNameLocal || null,
         });
       }
 
@@ -293,7 +373,8 @@ export default function SmartSearch() {
       }
     } catch (err) {
       setStatus("error");
-      setErrorMsg(err.message || t("searchErrorGeneric"));
+      setSessionExpired(err instanceof ApiError && err.isUnauthorized);
+      setErrorMsg(searchErrorMessage(err, tr));
     }
   }
 
@@ -442,14 +523,23 @@ export default function SmartSearch() {
             <div className="flex flex-col items-center gap-3 py-16 text-center">
               <AlertCircle className="size-6 text-error" />
               <p className="text-error text-sm">{errorMsg}</p>
-              <button
-                type="button"
-                onClick={runSearch}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
-              >
-                <RotateCcw className="size-3.5" />
-                {t("searchRetry")}
-              </button>
+              {sessionExpired ? (
+                <Link
+                  to="/auth/login"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                >
+                  {tr({ ar: "تسجيل الدخول", en: "Log in", ur: "لاگ ان کریں" })}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={retrySearch}
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                >
+                  <RotateCcw className="size-3.5" />
+                  {t("searchRetry")}
+                </button>
+              )}
             </div>
           )}
 

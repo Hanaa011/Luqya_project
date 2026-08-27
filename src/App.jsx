@@ -5,6 +5,7 @@ import Nav from "./components/Nav";
 import Footer from "./components/Footer";
 import SplashIntro from "./components/SplashIntro";
 import ScrollToTop from "./components/ScrollToTop";
+import GlobalIncomingCallBanner from "./components/GlobalIncomingCallBanner";
 
 import Home from "./pages/Home";
 import Report from "./pages/Report";
@@ -21,6 +22,8 @@ import VerifyOtp from "./pages/auth/VerifyOtp";
 import NotificationComposer from "./pages/admin/NotificationComposer";
 import RequireAuth from "./components/RequireAuth";
 import Contact from "./pages/Contact";
+import Messages from "./pages/Messages";
+import Conversation from "./pages/Conversation";
 
 function NotFound() {
   return (
@@ -67,6 +70,7 @@ export default function App() {
       {showSplash && <SplashIntro onDone={dismissSplash} />}
 
       {!isAuthRoute && <Nav />}
+      {!isAuthRoute && <GlobalIncomingCallBanner />}
 
       <main className="flex-1">
         <Routes>
@@ -100,6 +104,22 @@ export default function App() {
     </RequireAuth>
   }
 />
+          <Route
+            path="/messages"
+            element={
+              <RequireAuth>
+                <Messages />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/messages/:id"
+            element={
+              <RequireAuth>
+                <Conversation />
+              </RequireAuth>
+            }
+          />
 
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/register" element={<Register />} />

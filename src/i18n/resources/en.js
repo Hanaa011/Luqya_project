@@ -68,6 +68,7 @@ export default {
   navReport: "Report",
   navBrowse: "My Reports",
   navDashboard: "Dashboard",
+  navMessages: "Messages",
   navToggleTheme: "Toggle theme",
   navOpenMenu: "Open menu",
   navCloseMenu: "Close menu",

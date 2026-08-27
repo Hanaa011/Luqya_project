@@ -21,6 +21,16 @@ export function aiSearch({ text, imageBase64, type, maxResults = 10, minimumScor
     contextDescription: context?.description,
     contextColor: context?.color,
     contextLocation: context?.location,
+    // "lost"/"found" - a direction already confirmed by an earlier message
+    // in this conversation (see AiSearchInputDto.ContextReportKind). Keeps
+    // a self-corrected direction from being lost on a later turn that only
+    // adds a location/color and doesn't restate the user's role.
+    contextReportKind: context?.reportKind,
+    // The item's name in the language the searcher wrote in (see
+    // AiSearchInputDto.ContextItemNameLocal) - a real search-quality signal
+    // (candidate descriptions are often bilingual), not just wording, so
+    // this must survive follow-up turns exactly like the other fields.
+    contextItemNameLocal: context?.itemNameLocal,
   });
 }
 
