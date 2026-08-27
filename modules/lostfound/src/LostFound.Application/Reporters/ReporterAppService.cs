@@ -44,12 +44,22 @@ namespace LostFound.Reporters
             _reporterManager = reporterManager;
         }
 
+        // Privacy fix: in-platform conversations (LostFound.Conversations)
+        // are now the intended way to reach a reporter - this legacy
+        // lookup's authorization (EnsureCanViewReporterAsync, unchanged)
+        // still gates who reaches this method at all, but the raw
+        // Phone/Email are now redacted from the returned DTO regardless of
+        // who's asking, so the old contact-info leak is closed whether
+        // this is called from the frontend or directly (Swagger/Postman/
+        // any REST client). CreateAsync/UpdateAsync are deliberately NOT
+        // touched - those return the caller's own just-submitted contact
+        // info, not someone else's.
         public async Task<ReporterDto> GetAsync(Guid id)
         {
             await EnsureCanViewReporterAsync(id);
 
             var reporter = await _reporterRepository.GetAsync(id);
-            return ObjectMapper.Map<Reporter, ReporterDto>(reporter);
+            return RedactContactInfo(ObjectMapper.Map<Reporter, ReporterDto>(reporter));
         }
 
         public async Task<PagedResultDto<ReporterDto>> GetListAsync(PagedAndSortedResultRequestDto input)
@@ -66,10 +76,17 @@ namespace LostFound.Reporters
                 queryable.OrderBy(sorting).Skip(input.SkipCount).Take(input.MaxResultCount)
             );
 
-            return new PagedResultDto<ReporterDto>(
-                totalCount,
-                ObjectMapper.Map<System.Collections.Generic.List<Reporter>, System.Collections.Generic.List<ReporterDto>>(reporters)
-            );
+            var dtos = ObjectMapper.Map<System.Collections.Generic.List<Reporter>, System.Collections.Generic.List<ReporterDto>>(reporters);
+            dtos.ForEach(dto => RedactContactInfo(dto));
+
+            return new PagedResultDto<ReporterDto>(totalCount, dtos);
+        }
+
+        private static ReporterDto RedactContactInfo(ReporterDto dto)
+        {
+            dto.Phone = string.Empty;
+            dto.Email = null;
+            return dto;
         }
 
         // Every report id created by a reporter the current user is

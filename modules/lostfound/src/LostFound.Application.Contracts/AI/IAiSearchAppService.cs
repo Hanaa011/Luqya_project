@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Services;
 using LostFound.AI.Dtos;
@@ -9,6 +8,6 @@ namespace LostFound.AI
     // IMatchAppService by design.
     public interface IAiSearchAppService : IApplicationService
     {
-        Task<List<AiSearchResultDto>> SearchAsync(AiSearchInputDto input);
+        Task<AiSearchResponseDto> SearchAsync(AiSearchInputDto input);
     }
 }

@@ -2,11 +2,13 @@ using System;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.BackgroundJobs;
 using Volo.Abp.BlobStoring;
+using LostFound.AI.AiService;
 using LostFound.Reports.Dtos;
 using LostFound.Reporters;
 using LostFound.BackgroundJobs;
@@ -22,19 +24,25 @@ namespace LostFound.Reports
         private readonly IBackgroundJobManager _backgroundJobManager;
         private readonly IBlobContainer<ReportImageContainer> _imageContainer;
         private readonly IImageValidator _imageValidator;
+        private readonly IAiServiceClient _aiServiceClient;
+        private readonly ILogger<ReportAppService> _logger;
 
         public ReportAppService(
             IReportRepository reportRepository,
             ReporterManager reporterManager,
             IBackgroundJobManager backgroundJobManager,
             IBlobContainer<ReportImageContainer> imageContainer,
-            IImageValidator imageValidator)
+            IImageValidator imageValidator,
+            IAiServiceClient aiServiceClient,
+            ILogger<ReportAppService> logger)
         {
             _reportRepository = reportRepository;
             _reporterManager = reporterManager;
             _backgroundJobManager = backgroundJobManager;
             _imageContainer = imageContainer;
             _imageValidator = imageValidator;
+            _aiServiceClient = aiServiceClient;
+            _logger = logger;
         }
 
         // PHASE-VALIDATION-08: see IReportAppService.UploadImageAsync.
@@ -93,6 +101,50 @@ namespace LostFound.Reports
             return new PagedResultDto<ReportDto>(totalCount, reports.Select(MapToDto).ToList());
         }
 
+        // Reuses ai_service's analysis-only endpoint (IAiServiceClient.AnalyzeImageAsync
+        // -> POST /api/ai/analyze-image, no matching call) to enrich a found-item
+        // report's free-text Description synchronously at creation time. This is
+        // additive to, not a replacement for, ReportMatchingBackgroundJob's own
+        // async classification (which still runs afterward and fills the
+        // separate AiObjectType/Color/AiBrand fields via the existing provider
+        // chain - CreateReportDto has no slot for those, only Description).
+        // Best-effort: any failure here is logged and swallowed so report
+        // creation is never blocked by ai_service being unavailable.
+        private async Task<string?> BuildFoundItemDescriptionAsync(ReportType type, string? imagePath, string? description)
+        {
+            if (type != ReportType.Found || string.IsNullOrWhiteSpace(imagePath))
+            {
+                return description;
+            }
+
+            try
+            {
+                if (!await _imageContainer.ExistsAsync(imagePath))
+                {
+                    return description;
+                }
+
+                var imageBytes = await _imageContainer.GetAllBytesAsync(imagePath);
+                var mimeType = ImageMimeTypeResolver.Resolve(imageBytes);
+
+                var analysis = await _aiServiceClient.AnalyzeImageAsync(imageBytes, mimeType);
+
+                if (string.IsNullOrWhiteSpace(analysis.Description))
+                {
+                    return description;
+                }
+
+                return string.IsNullOrWhiteSpace(description)
+                    ? analysis.Description
+                    : $"{description}. {analysis.Description}";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "ai_service image analysis failed for a found-item report; continuing with the user-provided description only.");
+                return description;
+            }
+        }
+
         // Workflow: Save Report (no Category) -> Queue Background Job -> AI
         // Classification -> Embeddings -> Matching -> Notification.
         public async Task<ReportDto> CreateAsync(CreateReportDto input)
@@ -124,12 +176,14 @@ namespace LostFound.Reports
                 );
             }
 
+            var description = await BuildFoundItemDescriptionAsync(input.Type, input.ImagePath, input.Description);
+
             var report = new Report(
                 GuidGenerator.Create(),
                 reporter.Id,
                 input.LocationId,
                 input.Type,
-                input.Description,
+                description,
                 input.LocationDetails,
                 input.LostFoundDate,
                 input.ImagePath,
