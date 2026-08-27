@@ -127,11 +127,25 @@ def semantic_text(item: ItemData) -> str:
     reliably judge relatedness against another bare word ("apple pencil"),
     but pairing it with color ("white stylus" vs "white apple pencil")
     gives enough context to separate genuinely-same objects from
-    genuinely-different ones."""
-    description = normalize_text(item.description)
+    genuinely-different ones.
 
-    if description:
-        return description
+    native_name (query-side only - see ItemData) is prepended when present.
+    Root cause this addresses: a chat-extracted query description is
+    translated to English ("red scarf"), while a candidate report's own
+    description can be bilingual (a native-language item mention plus an
+    English visual description, e.g. from image-analysis enrichment at
+    creation). Comparing an English-only query against that bilingual text
+    measurably under-scores real matches - embedding cosine similarity on a
+    real example rose from ~0.30 to ~0.51 just by also including the
+    original-language item word the user actually typed. This is general
+    (native_name comes from the same extraction as everything else, for
+    ANY item/language), not a per-item translation table."""
+    description = normalize_text(item.description)
+    native = normalize_text(item.native_name)
+    combined = " ".join(part for part in (native, description) if part)
+
+    if combined:
+        return combined
 
     return " ".join(part for part in (normalize_color(item.color), normalize_type(item.type)) if part)
 

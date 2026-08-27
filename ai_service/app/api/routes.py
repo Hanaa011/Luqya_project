@@ -93,12 +93,30 @@ def build_known_context(
     context_description: str | None,
     context_color: str | None,
     context_location: str | None,
+    context_report_kind: str | None = None,
+    context_item_name_local: str | None = None,
 ) -> dict | None:
     known_context = {
         "type": clean_text(context_type),
         "description": clean_text(context_description),
         "color": clean_text(context_color),
         "location": clean_text(context_location),
+        # Not text to clean - either "lost", "found", or absent. Carries a
+        # confirmed direction (revealed by an earlier message such as
+        # "وجدت قلادة حمراء") forward across turns that don't restate it
+        # (e.g. a later "في المول" reply) - see chat_search's fallback.
+        "report_kind": context_report_kind if context_report_kind in ("lost", "found") else None,
+        # The exact original-language item word extracted on an earlier
+        # turn (e.g. "الشماغ") - carried forward VERBATIM (plain Python
+        # fallback in chat_service, not re-derived by the model) so a later
+        # turn's search never loses it to a re-guessed synonym. Measured:
+        # asking the model to reconstruct this from just the known English
+        # type on a bare follow-up ("في قاعة نوف") is not reliable at
+        # temperature=0 - it produced "الشماغ"/"الشال"/"الوشاح" across
+        # otherwise-identical calls, which swung a real match's score
+        # between ~30 and ~90 depending on which synonym happened to come
+        # back. Verbatim passthrough removes that variance entirely.
+        "item_name_local": clean_text(context_item_name_local),
     }
     return known_context if any(known_context.values()) else None
 
@@ -278,6 +296,7 @@ async def match_image(
     context_description: str | None = Form(None),
     context_color: str | None = Form(None),
     context_location: str | None = Form(None),
+    context_report_kind: str | None = Form(None),
 ):
     is_finder = parse_report_kind(report_kind)
 
@@ -300,11 +319,20 @@ async def match_image(
         description = f"{description}. {message_text}" if description else message_text
 
     known_context = build_known_context(
-        context_type, context_description, context_color, context_location
+        context_type, context_description, context_color, context_location, context_report_kind
     )
     item_type, description, color, location_name = merge_known_context(
         item_type, description, color, clean_text(location_name), known_context
     )
+
+    # Image search has no text to detect intent from itself - if an earlier
+    # turn in this conversation already confirmed a direction (e.g. "وجدت
+    # قلادة" followed by an attached photo), keep using it instead of
+    # falling back to the caller-supplied pill.
+    known_report_kind = (known_context or {}).get("report_kind")
+    if known_report_kind:
+        is_finder = parse_report_kind(known_report_kind)
+    resolved_report_kind = "found" if is_finder else "lost"
 
     extracted_item = {
         "type": item_type,
@@ -319,7 +347,7 @@ async def match_image(
             "should_match": False,
             "extracted_item": extracted_item,
             "follow_up_prompt": None,
-            "report_kind": report_kind,
+            "report_kind": resolved_report_kind,
             "candidate_count": 0,
             "matches": [],
             "best_match": None,
@@ -360,7 +388,7 @@ async def match_image(
             "extracted_item": extracted_item,
             "follow_up_prompt": follow_up_prompt,
             "analyzed_item": query_item.model_dump(),
-            "report_kind": report_kind,
+            "report_kind": resolved_report_kind,
             "candidate_kind": "lost" if is_finder else "found",
         },
     )
@@ -376,6 +404,8 @@ async def chat_search(
     context_description: str | None = Form(None),
     context_color: str | None = Form(None),
     context_location: str | None = Form(None),
+    context_report_kind: str | None = Form(None),
+    context_item_name_local: str | None = Form(None),
 ):
     is_finder = parse_report_kind(report_kind)
     cleaned_message = clean_text(message)
@@ -384,17 +414,36 @@ async def chat_search(
         raise HTTPException(status_code=400, detail="Message is required.")
 
     known_context = build_known_context(
-        context_type, context_description, context_color, context_location
+        context_type, context_description, context_color, context_location,
+        context_report_kind, context_item_name_local,
     )
 
     try:
-        extracted_data = extract_item_from_message(cleaned_message, known_context)
+        extracted_data = await extract_item_from_message(cleaned_message, known_context)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=502, detail="AI returned invalid chat extraction data.") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    # The pill/caller-supplied direction (report_kind form field, already
+    # parsed into is_finder above) stays authoritative UNLESS natural-
+    # language intent confidently says otherwise - extract_item_from_message
+    # already resolves this fully (this message's own verb, falling back to
+    # a role already confirmed earlier in the conversation via known_context
+    # - see its own report_kind merge), so this is single-sourced from its
+    # result, not re-derived here.
+    detected_report_kind = extracted_data.get("report_kind")
+    if detected_report_kind == "found":
+        is_finder = True
+    elif detected_report_kind == "lost":
+        is_finder = False
+
+    # Echoed back by the frontend as the next turn's context_report_kind /
+    # context_item_name_local respectively - see build_known_context.
+    resolved_report_kind = detected_report_kind
+    resolved_item_name_local = extracted_data.get("item_name_local")
 
     if extracted_data.get("should_match") is not True:
         return {
@@ -406,6 +455,8 @@ async def chat_search(
                 "color": extracted_data.get("color"),
                 "location": extracted_data.get("location"),
             },
+            "report_kind": resolved_report_kind,
+            "item_name_local": resolved_item_name_local,
             "follow_up_prompt": None,
             "candidate_count": 0,
             "matches": [],
@@ -423,6 +474,8 @@ async def chat_search(
             "reply": extracted_data.get("reply") or "فضلاً اذكري نوع الغرض أو وصفًا واضحًا له حتى أتمكن من البحث.",
             "should_match": False,
             "extracted_item": {"type": item_type, "description": description, "color": color, "location": location},
+            "report_kind": resolved_report_kind,
+            "item_name_local": resolved_item_name_local,
             "follow_up_prompt": None,
             "candidate_count": 0,
             "matches": [],
@@ -437,6 +490,7 @@ async def chat_search(
         lost_found_date=normalize_datetime(lost_found_date),
         is_item_with_finder=is_finder,
         location_name=location,
+        native_name=resolved_item_name_local,
     )
 
     candidates = get_reports_by_kind(await fetch_mapped_reports(), not is_finder)
@@ -453,6 +507,8 @@ async def chat_search(
             "reply": extracted_data.get("reply"),
             "should_match": True,
             "extracted_item": {"type": item_type, "description": description, "color": color, "location": location},
+            "report_kind": resolved_report_kind,
+            "item_name_local": resolved_item_name_local,
             "follow_up_prompt": None,
         },
     )

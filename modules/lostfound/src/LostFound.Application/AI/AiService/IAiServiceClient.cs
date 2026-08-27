@@ -21,12 +21,12 @@ namespace LostFound.AI.AiService
         // each element is a single concise current value, never history.
         Task<AiServiceSearchResult> SearchTextAsync(
             string text, string? locationName, bool isFinder,
-            (string? Type, string? Description, string? Color, string? Location) knownContext,
+            (string? Type, string? Description, string? Color, string? Location, string? ReportKind, string? ItemNameLocal) knownContext,
             CancellationToken cancellationToken = default);
 
         Task<AiServiceSearchResult> SearchImageAsync(
             byte[] imageBytes, string mimeType, string? text, string? locationName, bool isFinder,
-            (string? Type, string? Description, string? Color, string? Location) knownContext,
+            (string? Type, string? Description, string? Color, string? Location, string? ReportKind, string? ItemNameLocal) knownContext,
             CancellationToken cancellationToken = default);
 
         // Analysis only - never calls ai_service's matching logic.
@@ -63,6 +63,8 @@ namespace LostFound.AI.AiService
         public string? ExtractedDescription { get; set; }
         public string? ExtractedColor { get; set; }
         public string? ExtractedLocation { get; set; }
+        public string? ReportKind { get; set; }
+        public string? ItemNameLocal { get; set; }
         public string? FollowUpPrompt { get; set; }
         public List<AiServiceMatch> Matches { get; set; } = new();
     }

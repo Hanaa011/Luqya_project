@@ -28,7 +28,7 @@ namespace LostFound.AI.AiService
 
         public Task<AiServiceSearchResult> SearchTextAsync(
             string text, string? locationName, bool isFinder,
-            (string? Type, string? Description, string? Color, string? Location) knownContext,
+            (string? Type, string? Description, string? Color, string? Location, string? ReportKind, string? ItemNameLocal) knownContext,
             CancellationToken cancellationToken = default)
         {
             return ResilientProviderDecorator.ExecuteAsync(
@@ -50,12 +50,24 @@ namespace LostFound.AI.AiService
                 },
                 "ai_service chat-search",
                 _logger,
-                cancellationToken);
+                cancellationToken,
+                // Root-caused latency fix: a timeout here almost never means
+                // "transient network blip" (the default this decorator was
+                // written for) - chat-search's own work (LLM extraction +
+                // report fetch) is naturally slower and more variable than a
+                // typical provider call, so a timeout usually just means
+                // "still legitimately working." Retrying doesn't make that
+                // underlying work faster - it only piles another full
+                // attempt's wait on top, which measured as a large chunk of
+                // the reported "close to a minute" cases. One attempt, sized
+                // by a realistic TimeoutSeconds (see AiServiceOptions),
+                // avoids that compounding wait entirely.
+                maxAttempts: 1);
         }
 
         public Task<AiServiceSearchResult> SearchImageAsync(
             byte[] imageBytes, string mimeType, string? text, string? locationName, bool isFinder,
-            (string? Type, string? Description, string? Color, string? Location) knownContext,
+            (string? Type, string? Description, string? Color, string? Location, string? ReportKind, string? ItemNameLocal) knownContext,
             CancellationToken cancellationToken = default)
         {
             return ResilientProviderDecorator.ExecuteAsync(
@@ -81,7 +93,12 @@ namespace LostFound.AI.AiService
                 },
                 "ai_service match-image",
                 _logger,
-                cancellationToken);
+                cancellationToken,
+                // Same reasoning as SearchTextAsync - image search (vision +
+                // extraction + report fetch) is the single slowest call this
+                // client makes; retrying a timeout here only compounds the
+                // wait for no benefit.
+                maxAttempts: 1);
         }
 
         public Task<AiImageAnalysisResult> AnalyzeImageAsync(
@@ -110,7 +127,7 @@ namespace LostFound.AI.AiService
 
         private static void AddKnownContext(
             MultipartFormDataContent content,
-            (string? Type, string? Description, string? Color, string? Location) knownContext)
+            (string? Type, string? Description, string? Color, string? Location, string? ReportKind, string? ItemNameLocal) knownContext)
         {
             if (!string.IsNullOrWhiteSpace(knownContext.Type))
             {
@@ -128,6 +145,14 @@ namespace LostFound.AI.AiService
             {
                 content.Add(new StringContent(knownContext.Location), "context_location");
             }
+            if (!string.IsNullOrWhiteSpace(knownContext.ReportKind))
+            {
+                content.Add(new StringContent(knownContext.ReportKind), "context_report_kind");
+            }
+            if (!string.IsNullOrWhiteSpace(knownContext.ItemNameLocal))
+            {
+                content.Add(new StringContent(knownContext.ItemNameLocal), "context_item_name_local");
+            }
         }
 
         private static AiServiceSearchResult ToSearchResult(AiSearchResponseBody body) => new()
@@ -138,6 +163,8 @@ namespace LostFound.AI.AiService
             ExtractedDescription = body.ExtractedItem?.Description,
             ExtractedColor = body.ExtractedItem?.Color,
             ExtractedLocation = body.ExtractedItem?.Location,
+            ReportKind = body.ReportKind,
+            ItemNameLocal = body.ItemNameLocal,
             FollowUpPrompt = body.FollowUpPrompt,
             Matches = body.Matches ?? new List<AiServiceMatch>(),
         };
@@ -175,6 +202,12 @@ namespace LostFound.AI.AiService
 
             [JsonPropertyName("extracted_item")]
             public ExtractedItemBody? ExtractedItem { get; set; }
+
+            [JsonPropertyName("report_kind")]
+            public string? ReportKind { get; set; }
+
+            [JsonPropertyName("item_name_local")]
+            public string? ItemNameLocal { get; set; }
 
             [JsonPropertyName("follow_up_prompt")]
             public string? FollowUpPrompt { get; set; }

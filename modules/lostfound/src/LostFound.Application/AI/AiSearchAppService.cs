@@ -187,7 +187,7 @@ namespace LostFound.AI
                 _ => new[] { false, true },
             };
 
-            var knownContext = (input.ContextType, input.ContextDescription, input.ContextColor, input.ContextLocation);
+            var knownContext = (input.ContextType, input.ContextDescription, input.ContextColor, input.ContextLocation, input.ContextReportKind, input.ContextItemNameLocal);
 
             var directionTasks = searcherIsFinderDirections
                 .Select(searcherIsFinder => imageBytes != null
@@ -207,6 +207,8 @@ namespace LostFound.AI
                 ExtractedDescription = primary.ExtractedDescription,
                 ExtractedColor = primary.ExtractedColor,
                 ExtractedLocation = primary.ExtractedLocation,
+                ReportKind = primary.ReportKind,
+                ItemNameLocal = primary.ItemNameLocal,
                 FollowUpPrompt = primary.FollowUpPrompt,
             };
 
@@ -217,8 +219,23 @@ namespace LostFound.AI
                 return response;
             }
 
-            var allMatches = directionResults.SelectMany(r => r.Matches).ToList();
-            response.Results = await EnrichAsync(allMatches, input.Type, input.MaxResults);
+            // Root-caused de-dup: now that report_kind self-correction can
+            // resolve BOTH directions to the same actual direction (the
+            // message clearly said "lost" or "found", overriding whichever
+            // direction each concurrent call originally started as - see
+            // ai_service's chat_search), those two calls' candidate pools
+            // are no longer guaranteed distinct, and a real report can come
+            // back from both, verbatim-identical, as two separate result
+            // entries. Keyed on whichever of FoundReportId/LostReportId is
+            // actually populated for that match (never both), keeping the
+            // higher-scoring copy on the rare chance the two direction
+            // calls' scores ever differ.
+            var allMatches = directionResults
+                .SelectMany(r => r.Matches)
+                .GroupBy(m => !string.IsNullOrWhiteSpace(m.FoundReportId) ? m.FoundReportId : m.LostReportId)
+                .Select(g => g.OrderByDescending(m => m.SimilarityScore).First())
+                .ToList();
+            response.Results = await EnrichAsync(allMatches, input.MaxResults);
 
             return response;
         }
@@ -226,24 +243,31 @@ namespace LostFound.AI
         /// <summary>
         /// ai_service's match results only carry the candidate's report id,
         /// score, and reason (see AiServiceMatch) - not its Description/Color/
-        /// AiObjectType/ImagePath. This looks each candidate up against the
-        /// same candidate pool ai_service itself searched
-        /// (IReportRepository.GetReportsByTypeAsync - every report of the
-        /// given type, regardless of whether its legacy EmbeddingJson has
-        /// been computed yet), so the response DTO is fully populated
-        /// without ai_service ever needing to know about those fields
-        /// itself, and without silently dropping a genuine match just
-        /// because the old embedding background job hasn't caught up.
+        /// AiObjectType/ImagePath. This looks each candidate up by id against
+        /// EVERY report, regardless of type. Root-cause fix: this used to
+        /// filter the lookup pool by input.Type, on the assumption that a
+        /// match's actual candidate type always agrees with the caller's
+        /// requested Type. That assumption breaks once natural-language
+        /// intent (see chat_search's report_kind self-correction) flips the
+        /// real search direction away from a caller-selected pill/Type that
+        /// contradicts the message - ai_service then correctly returns a
+        /// candidate of the OTHER type, but the old type-filtered lookup
+        /// here couldn't find it by id and silently dropped the match
+        /// (reportsById.TryGetValue failing below). The type filter added no
+        /// real correctness here in the first place - ai_service's own
+        /// is_item_with_finder filtering already guarantees every candidate
+        /// id it returns belongs to the right pool - so removing it only
+        /// removes a source of false negatives, never widens what can match.
         /// </summary>
         private async Task<List<AiSearchResultDto>> EnrichAsync(
-            List<AiServiceMatch> matches, ReportType? type, int maxResults)
+            List<AiServiceMatch> matches, int maxResults)
         {
             if (matches.Count == 0)
             {
                 return new List<AiSearchResultDto>();
             }
 
-            var candidateReports = await _reportRepository.GetReportsByTypeAsync(type);
+            var candidateReports = await _reportRepository.GetReportsByTypeAsync(null);
             var reportsById = candidateReports.ToDictionary(r => r.Id);
 
             var dto = new List<AiSearchResultDto>();

@@ -11,6 +11,12 @@ class ItemData(BaseModel):
     type: str | None = None
     description: str | None = None
     color: str | None = None
+    # Item name in the ORIGINAL language the searcher wrote in (e.g. "شماغ"),
+    # kept separate from the (often English-translated) description - see
+    # matching_service.semantic_text. Query-side only; candidates already
+    # carry their original-language wording inside their own description
+    # when relevant, so this is never populated for a candidate ItemData.
+    native_name: str | None = None
 
     lost_found_date: datetime | None = None
     image_path: str | None = None

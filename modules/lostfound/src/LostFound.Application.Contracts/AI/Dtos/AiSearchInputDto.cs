@@ -28,5 +28,26 @@ namespace LostFound.AI.Dtos
         public string? ContextDescription { get; set; }
         public string? ContextColor { get; set; }
         public string? ContextLocation { get; set; }
+
+        // "lost" or "found" - a direction already confirmed by an earlier
+        // message in this conversation (e.g. "وجدت قلادة حمراء"), echoed
+        // back from the previous turn's AiSearchResponseDto.ReportKind.
+        // Without this, a later turn that only adds a location/color (no
+        // verb, e.g. "في المول") would lose that correction and silently
+        // fall back to whatever direction the caller's selected pill
+        // implies - see AiSearchAppService/ai_service's chat_search.
+        public string? ContextReportKind { get; set; }
+
+        // The item's name in the ORIGINAL language the searcher wrote in
+        // (e.g. "الشماغ"), echoed back from AiSearchResponseDto.
+        // ItemNameLocal. Search-quality fix, not just wording: a candidate
+        // report's own description is often bilingual (an original-language
+        // item mention plus an English AI-generated visual description),
+        // so an English-only query measurably under-scores a real match
+        // against it - see ai_service's matching_service.semantic_text.
+        // Carried verbatim across turns (never re-derived from just the
+        // English type) because re-deriving it is not reliably the same
+        // word twice.
+        public string? ContextItemNameLocal { get; set; }
     }
 }

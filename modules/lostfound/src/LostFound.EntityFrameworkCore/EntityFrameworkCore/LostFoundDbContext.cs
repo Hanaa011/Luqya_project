@@ -8,6 +8,7 @@ using LostFound.Reporters;
 using LostFound.Reports;
 using LostFound.Notifications;
 using LostFound.Matches;
+using LostFound.Conversations;
 
 namespace LostFound.EntityFrameworkCore
 {
@@ -21,6 +22,7 @@ namespace LostFound.EntityFrameworkCore
         public DbSet<Notification> Notifications { get; set; } = null!;
         public DbSet<Match> Matches { get; set; } = null!;
         public DbSet<ReportClaim> ReportClaims { get; set; } = null!;
+        public DbSet<Conversation> Conversations { get; set; } = null!;
 
         public LostFoundDbContext(DbContextOptions<LostFoundDbContext> options) : base(options)
         {

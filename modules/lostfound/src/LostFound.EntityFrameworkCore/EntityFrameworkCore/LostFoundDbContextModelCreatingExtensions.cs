@@ -5,6 +5,7 @@ using LostFound.Reporters;
 using LostFound.Reports;
 using LostFound.Notifications;
 using LostFound.Matches;
+using LostFound.Conversations;
 
 namespace LostFound.EntityFrameworkCore
 {
@@ -21,6 +22,7 @@ namespace LostFound.EntityFrameworkCore
             builder.ConfigureNotification();
             builder.ConfigureMatch();
             builder.ConfigureReportClaim();
+            builder.ConfigureConversation();
         }
     }
 }

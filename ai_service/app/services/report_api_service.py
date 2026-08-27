@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import Any
 
@@ -15,6 +16,15 @@ BACKEND_API_TOKEN = os.getenv("BACKEND_API_TOKEN")
 DEFAULT_MAX_RESULT_COUNT = 100
 MAX_ALLOWED_RESULT_COUNT = 1000
 REQUEST_TIMEOUT = 30.0
+
+# Measured: the backend's report-list endpoint alone can take several
+# seconds regardless of result size (see latency investigation). When the
+# type filter is unset, one user search fires two ai_service calls (one
+# per direction) within milliseconds of each other - genuinely concurrent,
+# not sequential. Single-flight fixes that: the second call attaches to
+# the FIRST call's already-running fetch instead of starting its own.
+# Deliberately NOT a TTL cache on top - see get_mapped_reports.
+_mapped_reports_inflight: dict[tuple[int | None, int | None], asyncio.Task] = {}
 
 
 def get_backend_base_url() -> str:
@@ -173,10 +183,8 @@ def map_report_to_item(report: dict) -> ItemData:
     )
 
 
-async def get_mapped_reports(
-    report_type: int | None = None,
-    status: int | None = None,
-    page_size: int = 100,
+async def _fetch_and_map_reports(
+    report_type: int | None, status: int | None, page_size: int
 ) -> list[ItemData]:
     reports = await get_all_reports(report_type=report_type, status=status, page_size=page_size)
 
@@ -192,3 +200,32 @@ async def get_mapped_reports(
             mapped_reports.append(item)
 
     return mapped_reports
+
+
+async def get_mapped_reports(
+    report_type: int | None = None,
+    status: int | None = None,
+    page_size: int = 100,
+) -> list[ItemData]:
+    cache_key = (report_type, status)
+
+    # Single-flight only - NOT a TTL cache. A TTL cache risks serving a
+    # snapshot from just before a report was created, which would make that
+    # brand-new report invisible to search for up to the TTL window - a real
+    # correctness bug ("newly created reports must become searchable
+    # quickly"), not just a latency one. Single-flight has no such risk: it
+    # only lets a second caller attach to a fetch that is ALREADY running
+    # right now, never to one that already finished - so every top-level
+    # search still triggers its own fresh fetch.
+    inflight = _mapped_reports_inflight.get(cache_key)
+    if inflight is not None and not inflight.done():
+        return await asyncio.shield(inflight)
+
+    task = asyncio.ensure_future(_fetch_and_map_reports(report_type, status, page_size))
+    _mapped_reports_inflight[cache_key] = task
+
+    try:
+        return await asyncio.shield(task)
+    finally:
+        if _mapped_reports_inflight.get(cache_key) is task:
+            del _mapped_reports_inflight[cache_key]
