@@ -5,11 +5,14 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Volo.Abp;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Authorization;
 using Volo.Abp.Domain.Entities;
+using Volo.Abp.Emailing;
 using Volo.Abp.Identity;
+using Volo.Abp.Uow;
 using LostFound.Calls;
 using LostFound.Conversations.Dtos;
 using LostFound.Reports;
@@ -29,6 +32,9 @@ namespace LostFound.Conversations
         private readonly IIdentityUserRepository _identityUserRepository;
         private readonly InMemoryCallStateStore _callStateStore;
         private readonly IConfiguration _configuration;
+        private readonly ReporterManager _reporterManager;
+        private readonly IEmailSender _emailSender;
+        private readonly IUnitOfWorkManager _unitOfWorkManager;
 
         public ConversationAppService(
             IConversationRepository conversationRepository,
@@ -36,7 +42,10 @@ namespace LostFound.Conversations
             IReporterRepository reporterRepository,
             IIdentityUserRepository identityUserRepository,
             InMemoryCallStateStore callStateStore,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ReporterManager reporterManager,
+            IEmailSender emailSender,
+            IUnitOfWorkManager unitOfWorkManager)
         {
             _conversationRepository = conversationRepository;
             _reportRepository = reportRepository;
@@ -44,6 +53,9 @@ namespace LostFound.Conversations
             _identityUserRepository = identityUserRepository;
             _callStateStore = callStateStore;
             _configuration = configuration;
+            _reporterManager = reporterManager;
+            _emailSender = emailSender;
+            _unitOfWorkManager = unitOfWorkManager;
         }
 
         public async Task<ConversationDto> OpenAsync(Guid reportId)
@@ -55,8 +67,37 @@ namespace LostFound.Conversations
 
             if (reporter.IdentityUserId == null)
             {
-                throw new UserFriendlyException(
-                    "This report's owner hasn't registered an account, so in-platform messaging isn't available for it yet.");
+                // Trigger (idempotently) the guest verification-claim email
+                // instead of just failing - see ReporterManager
+                // .IssueClaimTokenIfNeededAsync for the "don't resend while
+                // a valid token is still pending" guarantee. Only fires when
+                // we actually have somewhere to send it; a guest who only
+                // gave a phone number gets no claim email today (in scope:
+                // existing email infra only, no SMS), and the caller still
+                // gets the same clear, distinct error below either way.
+                if (!string.IsNullOrWhiteSpace(reporter.Email))
+                {
+                    // requiresNew: OpenAsync always throws right after this
+                    // (below), which would otherwise roll back the ambient
+                    // unit of work - and the token insert along with it. The
+                    // token/email side effect must survive that rollback, so
+                    // it gets its own independent transaction that commits
+                    // before the throw, regardless of what happens after.
+                    using var uow = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
+
+                    var rawToken = await _reporterManager.IssueClaimTokenIfNeededAsync(reporter.Id);
+                    if (rawToken != null)
+                    {
+                        await SendClaimEmailAsync(reporter.Email, rawToken);
+                    }
+
+                    await uow.CompleteAsync();
+                }
+
+                throw new BusinessException(
+                    ReporterErrorCodes.ReportOwnerNotClaimed,
+                    "This report's owner hasn't registered an account. We've emailed them a link to verify " +
+                    "and claim it - you'll be able to message them here once they do.");
             }
 
             var ownerId = reporter.IdentityUserId.Value;
@@ -272,6 +313,32 @@ namespace LostFound.Conversations
             var hash = SHA256.HashData(Encoding.UTF8.GetBytes(conversationId.ToString("N") + ":" + userId.ToString("N")));
             var value = BitConverter.ToUInt32(hash, 0);
             return value == 0 ? 1u : value; // 0 is reserved by Agora to mean "auto-assign"
+        }
+
+        // Best-effort: a delivery failure (e.g. SMTP not yet configured on
+        // this server) must not break the "This is my item" flow itself -
+        // the claim/token state above is already durable and idempotent
+        // regardless of whether this particular send succeeds. Logged, not
+        // swallowed silently.
+        private async Task SendClaimEmailAsync(string toEmail, string rawToken)
+        {
+            var claimUrl = $"{_configuration["App:AngularUrl"]?.TrimEnd('/')}/claim/{rawToken}";
+
+            try
+            {
+                await _emailSender.SendAsync(
+                    toEmail,
+                    "Someone found your lost/found report on Luqya",
+                    "Someone on Luqya believes they're related to a report you submitted. " +
+                    $"To let them message you, verify it's yours: {claimUrl}\n\n" +
+                    "This link works once and expires in 60 minutes. If you didn't submit a report on Luqya, " +
+                    "you can ignore this email.",
+                    isBodyHtml: false);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to send reporter claim email.");
+            }
         }
 
         private Guid RequireCurrentUserId()

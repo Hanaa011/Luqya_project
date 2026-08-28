@@ -18,6 +18,7 @@ namespace LostFound.EntityFrameworkCore
             builder.ConfigureCategory();
             builder.ConfigureLocation();
             builder.ConfigureReporter();
+            builder.ConfigureReporterClaimToken();
             builder.ConfigureReport();
             builder.ConfigureNotification();
             builder.ConfigureMatch();

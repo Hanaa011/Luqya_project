@@ -182,5 +182,17 @@ namespace LostFound.Reporters
         {
             await _reporterRepository.DeleteAsync(id);
         }
+
+        public async Task<ConfirmReporterClaimResultDto> ConfirmClaimAsync(ConfirmReporterClaimDto input)
+        {
+            if (!CurrentUser.IsAuthenticated || CurrentUser.Id == null)
+            {
+                throw new AbpAuthorizationException("You must be signed in to confirm this link.");
+            }
+
+            var reporter = await _reporterManager.ClaimGuestReportAsync(input.Token, CurrentUser.Id.Value);
+
+            return new ConfirmReporterClaimResultDto { ReporterId = reporter.Id };
+        }
     }
 }

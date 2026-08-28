@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Forge.Localization;
 using Forge.MultiTenancy;
 using System;
+using Volo.Abp.Emailing.Smtp;
 using Volo.Abp.Localization;
 using Volo.Abp.Modularity;
 using Volo.Abp.MultiTenancy;
@@ -46,8 +47,15 @@ public class ForgeDomainModule : AbpModule
         });
 
 
-#if DEBUG
-        context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
-#endif
+        // Real SMTP sending, reusing ABP's existing Volo.Abp.Emailing.Smtp
+        // .SmtpEmailSender (already referenced, no new provider) - it reads
+        // its Host/Port/UserName/Password/EnableSsl/DefaultFromAddress from
+        // the existing Email Settings management API (Abp.Mailing.* setting
+        // names), which the backend developer configures with the server's
+        // real credentials. Previously this was NullEmailSender (Debug-only,
+        // meaning it was already an effective no-op here since local runs
+        // are Debug builds), which is why no email has ever actually gone
+        // out from this app yet.
+        context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, SmtpEmailSender>());
     }
 }

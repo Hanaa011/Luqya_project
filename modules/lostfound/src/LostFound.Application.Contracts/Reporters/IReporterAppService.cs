@@ -17,5 +17,10 @@ namespace LostFound.Reporters
         Task<ReporterDto> UpdateAsync(Guid id, UpdateReporterDto input);
 
         Task DeleteAsync(Guid id);
+
+        // Redeems a guest-report claim-verification link (sent by
+        // ConversationAppService.OpenAsync) for the current, now-
+        // authenticated caller.
+        Task<ConfirmReporterClaimResultDto> ConfirmClaimAsync(ConfirmReporterClaimDto input);
     }
 }

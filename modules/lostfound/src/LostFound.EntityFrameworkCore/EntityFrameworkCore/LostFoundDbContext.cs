@@ -18,6 +18,7 @@ namespace LostFound.EntityFrameworkCore
         public DbSet<Category> Categories { get; set; } = null!;
         public DbSet<Location> Locations { get; set; } = null!;
         public DbSet<Reporter> Reporters { get; set; } = null!;
+        public DbSet<ReporterClaimToken> ReporterClaimTokens { get; set; } = null!;
         public DbSet<Report> Reports { get; set; } = null!;
         public DbSet<Notification> Notifications { get; set; } = null!;
         public DbSet<Match> Matches { get; set; } = null!;
