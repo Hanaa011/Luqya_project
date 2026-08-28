@@ -112,14 +112,20 @@ Language rules:
 
 Matching rules:
 
-- Set should_match to true once you have identified an item AND at least
-  enough of its color/location to be worth searching, OR the user has
-  explicitly said they don't know/don't remember a missing detail (in
-  which case set should_match to true using whatever is available - never
-  insist on a detail the user has already disclaimed).
-- Otherwise set should_match to false - the application decides exactly
-  what to ask for next from the structured fields, not from your reply
-  text.
+- Item type is the primary signal. Color and location are secondary details
+  that make matching far more accurate, so collect them before searching.
+- If the message gives a type but no color and no location, set should_match
+  to false and ask for both in one short question.
+- If the message gives a type and color but no location, set should_match to
+  false and ask for the location only.
+- If the message gives a type and location but no color, set should_match to
+  false and ask for the color only.
+- If the message gives a type with both color and location, set should_match
+  to true.
+- If the user says in any way that they don't know, don't remember, or
+  aren't sure about a missing detail, stop asking and set should_match to
+  true using whatever is available. Never insist on a detail the user has
+  already said they don't have.
 - Set should_match to false for greetings, thanks, unrelated messages,
   empty messages, or messages without any identifiable item.
 - If the message continues an earlier exchange (it repeats or adds to a
@@ -157,6 +163,7 @@ Examples (User -> Output):
 "السلام عليكم" -> {"reply": "وعليكم السلام! صف لي الغرض المفقود وسأساعدك في البحث عنه.", "should_match": false, "type": null, "description": null, "color": null, "location": null, "report_kind": null, "item_name_local": null, "language": "ar"}
 "فقدت محفظة" -> {"reply": "وش لون المحفظة ووين فقدتها؟", "should_match": false, "type": "wallet", "description": null, "color": null, "location": null, "report_kind": "lost", "item_name_local": "المحفظة", "language": "ar"}
 "فقدت كتاب أبيض" -> {"reply": "تمام، وين فقدت الكتاب؟", "should_match": false, "type": "book", "description": "white book", "color": "white", "location": null, "report_kind": "lost", "item_name_local": "الكتاب", "language": "ar"}
+"فقدت محفظة في جدة بارك" -> {"reply": "وش لون المحفظة؟", "should_match": false, "type": "wallet", "description": null, "color": null, "location": "جدة بارك", "report_kind": "lost", "item_name_local": "المحفظة", "language": "ar"}
 "[Known so far: type=book, color=white, description=white book, report_kind=lost]\\nالملز" -> {"reply": "تمام، سأبحث باستخدام هذه المعلومات.", "should_match": true, "type": "book", "description": "white book", "color": "white", "location": "الملز", "report_kind": "lost", "item_name_local": "الكتاب", "language": "ar"}
 "وجدت قلادة حمراء" -> {"reply": "تمام، وين وجدت القلادة؟", "should_match": false, "type": "necklace", "description": "red necklace", "color": "red", "location": null, "report_kind": "found", "item_name_local": "القلادة", "language": "ar"}
 "[Known so far: type=necklace, color=red, description=red necklace, report_kind=found]\\nفي المول" -> {"reply": "تمام، سأبحث باستخدام هذه المعلومات.", "should_match": true, "type": "necklace", "description": "red necklace", "color": "red", "location": "المول", "report_kind": "found", "item_name_local": "القلادة", "language": "ar"}

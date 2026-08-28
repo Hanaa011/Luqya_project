@@ -24,6 +24,13 @@ class ItemData(BaseModel):
     pickup_location: str | None = None
     status: str | None = None
     location_name: str | None = None
+    # Candidate-side only (defaults True so a query, which is never "AI
+    # classified", is unaffected). False only for the few seconds between
+    # report creation and ReportMatchingBackgroundJob actually finishing -
+    # see matching_service.calculate_match_score's `supported` check for
+    # why this matters: a still-null AiObjectType/Color on such a report
+    # isn't a genuine "doesn't match" signal, just "not yet known".
+    is_ai_classified: bool = True
 
 
 class MatchRequest(BaseModel):

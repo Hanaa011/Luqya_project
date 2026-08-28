@@ -180,6 +180,14 @@ def map_report_to_item(report: dict) -> ItemData:
         pickup_location=clean_text(pick(report, "pickupLocation", "pickup_location")),
         status=clean_text(pick(report, "statusName", "status")),
         location_name=clean_text(pick(report, "locationDetails", "locationName", "location_name")),
+        # Read directly, not via pick() - pick() skips falsy values, so a
+        # real `False` (mid-classification) would be silently treated as
+        # "missing" and default back to True (classified). Same
+        # isAiClassified/is_ai_classified casing fallback as
+        # is_item_with_finder above; defaults True when the key is absent.
+        is_ai_classified=bool(
+            report.get("isAiClassified", report.get("is_ai_classified", True))
+        ),
     )
 
 

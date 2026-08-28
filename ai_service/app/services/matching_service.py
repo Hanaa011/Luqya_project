@@ -208,6 +208,36 @@ def types_share_head_noun(type_a: str, type_b: str) -> bool:
     return len(words_a) >= 2 and len(words_b) >= 2 and words_a[-1] == words_b[-1]
 
 
+def strip_leading_al(text: str) -> str:
+    """Strips a leading Arabic definite article ("ال") from each word -
+    "الجامعة" and "جامعة" name the same place, but were previously compared
+    as literally different strings. Scoped to LOCATION comparison only
+    (not normalize_text itself), so type/native_name/semantic_text stay
+    exactly as they were. Guarded to require >=5 characters before
+    stripping (>=3 remaining after removal), so a short word that merely
+    starts with the same two letters isn't mangled - a general Arabic
+    light-stemming step, not tied to any specific place name."""
+    return " ".join(
+        word[2:] if word.startswith("ال") and len(word) >= 5 else word
+        for word in text.split()
+    )
+
+
+def color_partially_matches(value_a: str, value_b: str, canon_a: str, canon_b: str) -> bool:
+    """True when one side's single canonical color is literally present as
+    a whole word in the OTHER side's raw (un-collapsed) text - "red" vs
+    "red and white". normalize_color() resolves a multi-color string to
+    whichever ONE alias matches first (see its own normalize_alias call),
+    discarding any other color word in the same string - so field_score's
+    fuzzy subset check on the two ALREADY-collapsed canonical words alone
+    never sees "red" and "white" as separate tokens to compare. This
+    reuses normalize_text (unchanged, general) to look at the raw text
+    instead, purely as a fallback when the canonical forms didn't already
+    match - general word-presence check, not tied to any specific color."""
+    raw_a, raw_b = normalize_text(value_a).split(), normalize_text(value_b).split()
+    return (bool(canon_a) and canon_a in raw_b) or (bool(canon_b) and canon_b in raw_a)
+
+
 def calculate_match_score(
     first_item: ItemData,
     second_item: ItemData,
@@ -220,16 +250,36 @@ def calculate_match_score(
     if type_score is None and types_share_head_noun(normalized_type_a, normalized_type_b):
         type_score = 1.0
 
-    color_score = field_score(normalize_color(first_item.color), normalize_color(second_item.color))
+    normalized_color_a = normalize_color(first_item.color)
+    normalized_color_b = normalize_color(second_item.color)
+    color_score = field_score(normalized_color_a, normalized_color_b, fuzzy=True)
+
+    # color_score is 0.0 here (not None) whenever both colors are present
+    # but didn't match - field_score never passes a `known` set for color,
+    # so any non-equal, non-subset pair of present values is a confirmed
+    # conflict, not "unconfirmed". Only reconsider that specific case
+    # (never a genuine null-vs-present "unconfirmed" one) via the raw-text
+    # partial check.
+    if color_score == 0.0 and color_partially_matches(
+        first_item.color, second_item.color, normalized_color_a, normalized_color_b
+    ):
+        color_score = 1.0
     location_score = field_score(
-        normalize_text(first_item.location_name), normalize_text(second_item.location_name), fuzzy=True
+        strip_leading_al(normalize_text(first_item.location_name)),
+        strip_leading_al(normalize_text(second_item.location_name)),
+        fuzzy=True,
     )
 
     # A type that couldn't be confirmed by text alone may still be the same
     # object worded differently ("apple pencil" vs "stylus"). Trust a lower
     # semantic bar once a structured field is already confirmed matching -
     # that corroboration makes a moderate semantic signal more meaningful.
-    supported = color_score == 1.0 or location_score == 1.0
+    # A not-yet-classified candidate (still inside the few-second window
+    # before ReportMatchingBackgroundJob runs) gets the same trust: its
+    # null AiObjectType/Color reflect "not yet known", not a genuine
+    # mismatch, so it shouldn't be held to the same bar as a candidate
+    # that's actually been compared and found to share nothing.
+    supported = color_score == 1.0 or location_score == 1.0 or not second_item.is_ai_classified
     floor = SEMANTIC_FLOOR_SUPPORTED if supported else SEMANTIC_FLOOR
 
     if type_score is None and semantic_similarity >= floor:
