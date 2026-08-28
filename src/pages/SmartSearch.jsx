@@ -296,7 +296,17 @@ export default function SmartSearch() {
       if (userId) {
         let dismissedCount = 0;
 
-        const mine = await fetchMyReports({ userId });
+        // fetchMyReports (+ its dependent listMatches lookup below) and
+        // getMyDismissedReportIds are independent of each other - fetching
+        // them in parallel instead of one-after-another (as this used to)
+        // removes a full extra round trip from the tail end of every
+        // search, after the AI response (and its chat reply) has already
+        // arrived - see the loading-state note below.
+        const [mine, directDismissedIds] = await Promise.all([
+          fetchMyReports({ userId }),
+          getMyDismissedReportIds().catch(() => []),
+        ]);
+
         if (mine.reliable && mine.reports.length > 0) {
           const myIds = new Set(mine.reports.map((r) => r.id));
           const before = filtered.length;
@@ -343,17 +353,14 @@ export default function SmartSearch() {
         // this is the mechanism that actually closes the gap the old,
         // Match-based exclusion above could never handle (a user with
         // zero reports dismissing a result and it genuinely never
-        // resurfacing for them).
-        try {
-          const dismissedIds = await getMyDismissedReportIds();
-          if (dismissedIds?.length > 0) {
-            const dismissedSet = new Set(dismissedIds);
-            const beforeDirect = filtered.length;
-            filtered = filtered.filter((r) => !dismissedSet.has(r.reportId));
-            dismissedCount += beforeDirect - filtered.length;
-          }
-        } catch {
-          // Non-fatal, same reasoning as the Match-based exclusion above.
+        // resurfacing for them). Fetched above, in parallel with
+        // fetchMyReports; a failed fetch resolves to [] there (non-fatal,
+        // same reasoning as the Match-based exclusion above).
+        if (directDismissedIds?.length > 0) {
+          const dismissedSet = new Set(directDismissedIds);
+          const beforeDirect = filtered.length;
+          filtered = filtered.filter((r) => !dismissedSet.has(r.reportId));
+          dismissedCount += beforeDirect - filtered.length;
         }
 
         setDismissedExcluded(dismissedCount);
