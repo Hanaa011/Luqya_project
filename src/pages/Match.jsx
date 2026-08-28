@@ -439,10 +439,23 @@ export default function Match() {
             const conversation = await openConversation(report.id);
             navigate(`/messages/${conversation.id}`);
           } catch (err) {
+            // LostFound:Reporter:0003 - the report's original reporter is
+            // still a guest (no account yet). ConversationAppService
+            // .OpenAsync already emailed them a claim-verification link
+            // (idempotently - it won't resend one while a still-valid link
+            // is pending) - this is an expected, distinct outcome, not a
+            // generic failure.
+            const pendingClaim = err instanceof ApiError && err.code === "LostFound:Reporter:0003";
             setClaim({
               action,
               status: "error",
               error:
+                (pendingClaim &&
+                  tr({
+                    ar: "صاحب البلاغ لم يُنشئ حسابًا بعد. أرسلنا له رابط تحقق عبر البريد الإلكتروني - ستتمكن من مراسلته هنا فور تأكيده.",
+                    en: "The reporter hasn't registered an account yet. We've emailed them a verification link - you'll be able to message them here once they confirm.",
+                    ur: "رپورٹر نے ابھی اکاؤنٹ نہیں بنایا۔ ہم نے انہیں تصدیقی لنک ای میل کر دیا ہے - تصدیق کے بعد آپ یہاں ان سے بات کر سکیں گے۔",
+                  })) ||
                 err.message ||
                 tr({
                   ar: "تعذّر فتح المحادثة. حاول مرة أخرى.",

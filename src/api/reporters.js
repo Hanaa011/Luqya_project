@@ -6,3 +6,11 @@ import { api } from "./httpClient";
 export function getReporter(id, signal) {
   return api.get(`/api/app/reporter/${id}`, undefined, signal);
 }
+
+// ReporterAppService.ConfirmClaimAsync(ConfirmReporterClaimDto) ->
+// POST api/app/reporter/confirm-claim -> ConfirmReporterClaimResultDto.
+// Redeems the one-time link emailed to a guest report's original reporter
+// (triggered by ConversationAppService.OpenAsync) once they're logged in.
+export function confirmReporterClaim(token) {
+  return api.post("/api/app/reporter/confirm-claim", { token });
+}

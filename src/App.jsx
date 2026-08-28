@@ -24,6 +24,7 @@ import RequireAuth from "./components/RequireAuth";
 import Contact from "./pages/Contact";
 import Messages from "./pages/Messages";
 import Conversation from "./pages/Conversation";
+import ClaimReport from "./pages/ClaimReport";
 
 function NotFound() {
   return (
@@ -117,6 +118,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <Conversation />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/claim/:token"
+            element={
+              <RequireAuth>
+                <ClaimReport />
               </RequireAuth>
             }
           />
