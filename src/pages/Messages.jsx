@@ -10,10 +10,23 @@ function copy(lang, values) {
   return values[lang] ?? values.en;
 }
 
+// See Conversation.jsx's parseServerTime for why this is needed: a message
+// timestamp re-fetched from the backend (as this list always does) loses
+// its "Z"/UTC marker on the way through EF Core, and the ECMAScript Date
+// spec then parses the unmarked string as local time instead of UTC -
+// displaying it exactly the browser's UTC offset too early (3 hours behind
+// in Saudi Arabia). Treat an unmarked string as UTC explicitly; the actual
+// local conversion still comes from toLocaleString using the browser's own
+// timezone, never a hardcoded offset.
+function parseServerTime(iso) {
+  const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(iso);
+  return new Date(hasTimezone ? iso : `${iso}Z`);
+}
+
 function formatTime(iso) {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleString(undefined, {
+    return parseServerTime(iso).toLocaleString(undefined, {
       month: "short",
       day: "numeric",
       hour: "2-digit",

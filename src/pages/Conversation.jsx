@@ -27,10 +27,29 @@ function copy(lang, values) {
   return values[lang] ?? values.en;
 }
 
+// The backend serializes timestamps as UTC ("...Z"), but a value re-fetched
+// through EF Core loses that marker - SQL Server's datetime2 columns don't
+// store timezone info, so EF Core always returns DateTimeKind.Unspecified
+// on read, and the JSON then has no "Z"/offset at all (confirmed live: the
+// immediate send-message response carries "Z", the very same message
+// re-fetched via GET does not). Per the ECMAScript Date spec, a date-time
+// string with no timezone designator parses as LOCAL time, not UTC - so an
+// unmarked UTC value displayed exactly `browser-UTC-offset` hours off (3
+// hours behind in Saudi Arabia, UTC+3) as soon as the page reloaded or the
+// conversation was reopened, not just for "old" messages. Treat an
+// unmarked string as UTC explicitly (it genuinely is) instead of trusting
+// the browser's default local-time interpretation - never a hardcoded
+// offset, the actual conversion still comes from toLocaleTimeString using
+// the browser's own timezone.
+function parseServerTime(iso) {
+  const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(iso);
+  return new Date(hasTimezone ? iso : `${iso}Z`);
+}
+
 function formatTime(iso) {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return parseServerTime(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   } catch {
     return "";
   }
@@ -254,7 +273,20 @@ export default function Conversation() {
       myCallIdRef.current = credentials.callId;
       await agoraCall.joinChannel(credentials);
     } catch (err) {
-      setErrorMsg(err.message || "");
+      // Bug fix: this used to call setErrorMsg, which only ever renders on
+      // the page's initial-load failure screen (status === "error") - once
+      // the conversation itself has loaded, that state is never shown
+      // again, so a failed call silently did nothing visible at all. This
+      // is the actual live call-status area (see callNotice above), the
+      // same one "Call ended"/"Missed call" already use.
+      setCallNotice(
+        err.message ||
+          copy(lang, {
+            ar: "تعذّر بدء المكالمة. حاول مرة أخرى.",
+            en: "Couldn't start the call. Please try again.",
+            ur: "کال شروع نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+          })
+      );
     } finally {
       setCallActionPending(false);
     }
@@ -270,7 +302,15 @@ export default function Conversation() {
       myCallIdRef.current = credentials.callId;
       await agoraCall.joinChannel(credentials);
     } catch (err) {
-      setErrorMsg(err.message || "");
+      // Same fix as handleStartCall above.
+      setCallNotice(
+        err.message ||
+          copy(lang, {
+            ar: "تعذّر الانضمام إلى المكالمة. حاول مرة أخرى.",
+            en: "Couldn't join the call. Please try again.",
+            ur: "کال میں شامل نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
+          })
+      );
     } finally {
       setCallActionPending(false);
     }
