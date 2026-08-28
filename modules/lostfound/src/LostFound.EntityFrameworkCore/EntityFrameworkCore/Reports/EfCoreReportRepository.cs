@@ -58,5 +58,19 @@ namespace LostFound.Reports
 
             return await queryable.ToListAsync();
         }
+
+        public async Task<List<Report>> GetByIdsAsync(IEnumerable<Guid> ids)
+        {
+            var idList = ids as ICollection<Guid> ?? ids.ToList();
+
+            if (idList.Count == 0)
+            {
+                return new List<Report>();
+            }
+
+            var dbSet = await GetDbSetAsync();
+
+            return await dbSet.Where(r => idList.Contains(r.Id)).ToListAsync();
+        }
     }
 }

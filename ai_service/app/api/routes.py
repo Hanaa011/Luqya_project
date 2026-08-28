@@ -174,9 +174,9 @@ def get_match_decision(best_match: dict | None) -> dict | None:
     return classify_match(score)
 
 
-def run_matching(selected_item: ItemData, candidate_items: list[ItemData]) -> list[dict]:
+async def run_matching(selected_item: ItemData, candidate_items: list[ItemData]) -> list[dict]:
     try:
-        matches = find_matches(lost_item=selected_item, found_items=candidate_items)
+        matches = await find_matches(lost_item=selected_item, found_items=candidate_items)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -187,7 +187,7 @@ def run_matching(selected_item: ItemData, candidate_items: list[ItemData]) -> li
     return [serialize_match_result(match) for match in matches]
 
 
-def build_search_response(
+async def build_search_response(
     selected_item: ItemData,
     candidates: list[ItemData],
     empty_message: str,
@@ -203,7 +203,7 @@ def build_search_response(
             "message": empty_message,
         }
 
-    matches = run_matching(selected_item=selected_item, candidate_items=candidates)
+    matches = await run_matching(selected_item=selected_item, candidate_items=candidates)
     best_match = matches[0] if matches else None
 
     return {
@@ -254,7 +254,7 @@ async def match_report(report_id: str):
     report_kind = "found" if selected_report.is_item_with_finder is True else "lost"
     candidate_kind = "lost" if report_kind == "found" else "found"
 
-    return build_search_response(
+    return await build_search_response(
         selected_item=selected_report,
         candidates=candidate_reports,
         empty_message="لا توجد بلاغات من النوع المقابل متاحة للمقارنة حاليًا.",
@@ -374,7 +374,7 @@ async def match_image(
         else "تم العثور على نتائج بناءً على الصورة. هل يمكنك إضافة الموقع لتحسين النتائج؟"
     )
 
-    return build_search_response(
+    return await build_search_response(
         selected_item=query_item,
         candidates=candidates,
         empty_message=(
@@ -495,7 +495,7 @@ async def chat_search(
 
     candidates = get_reports_by_kind(await fetch_mapped_reports(), not is_finder)
 
-    return build_search_response(
+    return await build_search_response(
         selected_item=query_item,
         candidates=candidates,
         empty_message=(

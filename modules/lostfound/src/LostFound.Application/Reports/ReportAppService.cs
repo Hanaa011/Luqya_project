@@ -77,6 +77,21 @@ namespace LostFound.Reports
             return MapToDto(report);
         }
 
+        // Diagnosed root cause of the list endpoint scaling to 10+ seconds as
+        // row count grew (46 rows, otherwise-trivial query): the previous
+        // version materialized full Report entities, which include
+        // EmbeddingJson/MetadataEmbeddingJson/ImageEmbeddingJson - each a
+        // serialized float[] (~25-30KB of JSON text per populated column,
+        // up to 3 per row for an AI-classified report). MapToDto never reads
+        // their VALUES, only HasEmbedding's null-check and GetAiTags()'s
+        // (much smaller) AiTagsJson. SQL execution itself was consistently
+        // ~70ms (confirmed via temporary EF Core command logging); the
+        // remaining multi-second cost was fetching/materializing/GC-ing
+        // those large unused blob columns for every row. Projecting to only
+        // the columns ReportDto actually needs (below) makes EF Core
+        // generate a SELECT that never reads those columns off the wire in
+        // the first place - same rows, same DTO shape, same total/paging
+        // semantics, no API contract change.
         public async Task<PagedResultDto<ReportDto>> GetListAsync(GetReportListDto input)
         {
             var queryable = await _reportRepository.GetQueryableAsync();
@@ -94,11 +109,109 @@ namespace LostFound.Reports
             var totalCount = queryable.Count();
             var sorting = string.IsNullOrWhiteSpace(input.Sorting) ? "CreationTime desc" : input.Sorting;
 
-            var reports = await AsyncExecuter.ToListAsync(
+            var rows = await AsyncExecuter.ToListAsync(
                 queryable.OrderBy(sorting).Skip(input.SkipCount).Take(input.MaxResultCount)
+                    .Select(r => new ReportListRow
+                    {
+                        Id = r.Id,
+                        CreationTime = r.CreationTime,
+                        CreatorId = r.CreatorId,
+                        LastModificationTime = r.LastModificationTime,
+                        LastModifierId = r.LastModifierId,
+                        ReporterId = r.ReporterId,
+                        CategoryId = r.CategoryId,
+                        LocationId = r.LocationId,
+                        LocationDetails = r.LocationDetails,
+                        Type = r.Type,
+                        Description = r.Description,
+                        LostFoundDate = r.LostFoundDate,
+                        ImagePath = r.ImagePath,
+                        IsItemWithFinder = r.IsItemWithFinder,
+                        PickupLocation = r.PickupLocation,
+                        Status = r.Status,
+                        HasEmbedding = r.EmbeddingJson != null && r.EmbeddingJson != "",
+                        Color = r.Color,
+                        AiObjectType = r.AiObjectType,
+                        AiBrand = r.AiBrand,
+                        AiTagsJson = r.AiTagsJson,
+                        IsAiClassified = r.IsAiClassified,
+                    })
             );
 
-            return new PagedResultDto<ReportDto>(totalCount, reports.Select(MapToDto).ToList());
+            return new PagedResultDto<ReportDto>(totalCount, rows.Select(MapRowToDto).ToList());
+        }
+
+        // Mirrors Report.GetAiTags()'s own null/blank-safe deserialize
+        // (see Report.cs's private DeserializeJson<T>) - duplicated rather
+        // than shared because it operates on the raw AiTagsJson string from
+        // the projection above, not a live Report entity.
+        private static System.Collections.Generic.List<string> DeserializeAiTags(string? aiTagsJson)
+        {
+            if (string.IsNullOrWhiteSpace(aiTagsJson))
+            {
+                return new System.Collections.Generic.List<string>();
+            }
+
+            return System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(aiTagsJson)
+                ?? new System.Collections.Generic.List<string>();
+        }
+
+        private static ReportDto MapRowToDto(ReportListRow row)
+        {
+            return new ReportDto
+            {
+                Id = row.Id,
+                CreationTime = row.CreationTime,
+                CreatorId = row.CreatorId,
+                LastModificationTime = row.LastModificationTime,
+                LastModifierId = row.LastModifierId,
+                ReporterId = row.ReporterId,
+                CategoryId = row.CategoryId,
+                LocationId = row.LocationId,
+                LocationDetails = row.LocationDetails,
+                Type = row.Type,
+                Description = row.Description,
+                LostFoundDate = row.LostFoundDate,
+                ImagePath = row.ImagePath,
+                IsItemWithFinder = row.IsItemWithFinder,
+                PickupLocation = row.PickupLocation,
+                Status = row.Status,
+                HasEmbedding = row.HasEmbedding,
+                Color = row.Color,
+                AiObjectType = row.AiObjectType,
+                AiBrand = row.AiBrand,
+                AiTags = DeserializeAiTags(row.AiTagsJson),
+                IsAiClassified = row.IsAiClassified,
+            };
+        }
+
+        // Column-level projection shape for GetListAsync - deliberately
+        // excludes EmbeddingJson/MetadataEmbeddingJson/ImageEmbeddingJson
+        // (see GetListAsync's remarks) so EF Core never selects them.
+        private sealed class ReportListRow
+        {
+            public Guid Id { get; set; }
+            public DateTime CreationTime { get; set; }
+            public Guid? CreatorId { get; set; }
+            public DateTime? LastModificationTime { get; set; }
+            public Guid? LastModifierId { get; set; }
+            public Guid ReporterId { get; set; }
+            public Guid? CategoryId { get; set; }
+            public Guid LocationId { get; set; }
+            public string? LocationDetails { get; set; }
+            public ReportType Type { get; set; }
+            public string? Description { get; set; }
+            public DateTime? LostFoundDate { get; set; }
+            public string? ImagePath { get; set; }
+            public bool IsItemWithFinder { get; set; }
+            public string? PickupLocation { get; set; }
+            public ReportStatus Status { get; set; }
+            public bool HasEmbedding { get; set; }
+            public string? Color { get; set; }
+            public string? AiObjectType { get; set; }
+            public string? AiBrand { get; set; }
+            public string? AiTagsJson { get; set; }
+            public bool IsAiClassified { get; set; }
         }
 
         // Reuses ai_service's analysis-only endpoint (IAiServiceClient.AnalyzeImageAsync

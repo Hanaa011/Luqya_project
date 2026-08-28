@@ -1,3 +1,4 @@
+import asyncio
 import math
 import re
 import unicodedata
@@ -188,14 +189,37 @@ def field_score(value_a: str, value_b: str, known: set[str] | None = None, fuzzy
     return None
 
 
+def types_share_head_noun(type_a: str, type_b: str) -> bool:
+    """True when two open-vocabulary type phrases are the same real-world
+    category worded with a different modifier - "bank card" / "atm card" /
+    "credit card" / "visa card" all reduce to "card". English noun-noun
+    compounds are right-headed (the rightmost word is the grammatical
+    head; the words before it just narrow which kind), and chat_service's
+    SYSTEM_PROMPT already mandates the LLM output type as a short,
+    lowercase English phrase - so comparing the last word is a general
+    grammatical rule about that mandated output shape, not a table of
+    specific item names. field_score's own fuzzy subset check already
+    catches "bank card" vs "card" (a strict word subset); it does NOT
+    catch "bank card" vs "atm card", since neither phrase's words are a
+    subset of the other's - only their head noun agrees. Requires both
+    sides to be multi-word so a bare single-word type (already covered by
+    exact-match/alias/subset) never triggers this."""
+    words_a, words_b = type_a.split(), type_b.split()
+    return len(words_a) >= 2 and len(words_b) >= 2 and words_a[-1] == words_b[-1]
+
+
 def calculate_match_score(
     first_item: ItemData,
     second_item: ItemData,
     semantic_similarity: float,
 ) -> tuple[float, dict[str, float | None]]:
-    type_score = field_score(
-        normalize_type(first_item.type), normalize_type(second_item.type), KNOWN_TYPES, fuzzy=True
-    )
+    normalized_type_a = normalize_type(first_item.type)
+    normalized_type_b = normalize_type(second_item.type)
+    type_score = field_score(normalized_type_a, normalized_type_b, KNOWN_TYPES, fuzzy=True)
+
+    if type_score is None and types_share_head_noun(normalized_type_a, normalized_type_b):
+        type_score = 1.0
+
     color_score = field_score(normalize_color(first_item.color), normalize_color(second_item.color))
     location_score = field_score(
         normalize_text(first_item.location_name), normalize_text(second_item.location_name), fuzzy=True
@@ -261,7 +285,7 @@ def resolve_report_ids(first_item: ItemData, second_item: ItemData) -> tuple[str
     return first_id, second_id
 
 
-def find_matches(lost_item: ItemData, found_items: list[ItemData]) -> list[MatchResult]:
+async def find_matches(lost_item: ItemData, found_items: list[ItemData]) -> list[MatchResult]:
     if not found_items:
         return []
 
@@ -276,7 +300,17 @@ def find_matches(lost_item: ItemData, found_items: list[ItemData]) -> list[Match
         return []
 
     candidate_texts = [semantic_text(item) for item in valid_items]
-    embeddings = get_embeddings([selected_text] + candidate_texts)
+    # get_embeddings() makes a blocking (synchronous) OpenAI HTTP call.
+    # ai_service runs as a single asyncio worker (no --reload/--workers),
+    # so calling it directly here stalls the ENTIRE event loop for the
+    # duration of that call - including the OTHER concurrent direction
+    # call every unscoped text/image search fires (see
+    # AiSearchAppService.SearchWithAiServiceAsync's Task.WhenAll), which
+    # then queues behind this one instead of running in parallel as
+    # intended. asyncio.to_thread offloads it to a worker thread, freeing
+    # the event loop - same pattern chat_service.py's own OpenAI call
+    # already uses for exactly this reason.
+    embeddings = await asyncio.to_thread(get_embeddings, [selected_text] + candidate_texts)
 
     if len(embeddings) != len(valid_items) + 1:
         raise ValueError("Embedding response size mismatch.")

@@ -243,8 +243,9 @@ namespace LostFound.AI
         /// <summary>
         /// ai_service's match results only carry the candidate's report id,
         /// score, and reason (see AiServiceMatch) - not its Description/Color/
-        /// AiObjectType/ImagePath. This looks each candidate up by id against
-        /// EVERY report, regardless of type. Root-cause fix: this used to
+        /// AiObjectType/ImagePath. This looks each candidate up by id, fetched
+        /// by exactly those ids (see GetByIdsAsync) rather than every report,
+        /// regardless of type. Root-cause fix (type filter): this used to
         /// filter the lookup pool by input.Type, on the assumption that a
         /// match's actual candidate type always agrees with the caller's
         /// requested Type. That assumption breaks once natural-language
@@ -267,7 +268,23 @@ namespace LostFound.AI
                 return new List<AiSearchResultDto>();
             }
 
-            var candidateReports = await _reportRepository.GetReportsByTypeAsync(null);
+            // Root-cause latency fix: this used to fetch EVERY report via
+            // GetReportsByTypeAsync(null) just to look up the handful that
+            // actually matched - the same "full entity, every row" cost
+            // (each row carries EmbeddingJson/MetadataEmbeddingJson/
+            // ImageEmbeddingJson, ~25-30KB of unused JSON per populated
+            // column) that made ReportAppService.GetListAsync take 10+
+            // seconds, in a second, independent code path. matches already
+            // names exactly which reports are needed, so fetch only those.
+            var candidateIds = matches
+                .Select(m => !string.IsNullOrWhiteSpace(m.FoundReportId) ? m.FoundReportId : m.LostReportId)
+                .Select(idText => Guid.TryParse(idText, out var id) ? id : (Guid?)null)
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+
+            var candidateReports = await _reportRepository.GetByIdsAsync(candidateIds);
             var reportsById = candidateReports.ToDictionary(r => r.Id);
 
             var dto = new List<AiSearchResultDto>();

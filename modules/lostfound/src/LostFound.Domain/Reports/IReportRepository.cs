@@ -28,5 +28,11 @@ namespace LostFound.Reports
         // same pool to avoid silently dropping a real match during
         // enrichment just because the background embedding job hasn't run.
         Task<List<Report>> GetReportsByTypeAsync(ReportType? type);
+
+        // Used by AiSearchAppService.EnrichAsync to look up exactly the
+        // reports named by ai_service's own match results - a small, known
+        // id set, not the whole table (see EnrichAsync's remarks for why
+        // that distinction matters for latency).
+        Task<List<Report>> GetByIdsAsync(IEnumerable<Guid> ids);
     }
 }
