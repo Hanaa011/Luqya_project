@@ -391,8 +391,30 @@ export default function Conversation() {
                 })
               : errorMsg}
           </p>
-          <Link to="/messages" className="text-sm font-semibold text-primary hover:underline">
-            {copy(lang, { ar: "العودة إلى الرسائل", en: "Back to messages", ur: "پیغامات پر واپس جائیں" })}
+          <Link
+            to="/messages"
+            className="
+              inline-flex items-center gap-1.5
+              text-sm font-semibold text-muted-foreground/60
+              transition-colors duration-200
+              hover:text-primary
+              focus-visible:outline-none
+              focus-visible:text-primary
+              focus-visible:underline
+            "
+          >
+            <ArrowUpRight
+              className={`size-3 ${
+                lang === "ar" || lang === "ur" ? "" : "-scale-x-100"
+              }`}
+              strokeWidth={1.6}
+              aria-hidden="true"
+            />
+            {copy(lang, {
+              ar: "العودة إلى الرسائل",
+              en: "Back to messages",
+              ur: "پیغامات پر واپس جائیں",
+            })}
           </Link>
         </div>
       </section>
@@ -428,13 +450,22 @@ export default function Conversation() {
         <div className="mb-4">
           <Link
             to="/messages"
-            className="inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-stone-100 hover:text-foreground"
+            className="
+              inline-flex items-center gap-1.5
+              text-sm font-semibold text-muted-foreground/60
+              transition-colors duration-200
+              hover:text-primary
+              focus-visible:outline-none
+              focus-visible:text-primary
+              focus-visible:underline
+            "
           >
             <ArrowUpRight
-              className={`size-3.5 ${
+              className={`size-3 ${
                 lang === "ar" || lang === "ur" ? "" : "-scale-x-100"
               }`}
-              strokeWidth={1.7}
+              strokeWidth={1.6}
+              aria-hidden="true"
             />
             {copy(lang, {
               ar: "العودة إلى الرسائل",

@@ -5,13 +5,12 @@ import {
   Sparkles,
   MapPin,
   Calendar,
-  Mic,
   Check,
   Search,
   ScanEye,
   ListOrdered,
   BellRing,
-  ArrowLeft,
+  ArrowUpRight,
   AlertCircle,
 } from "lucide-react";
 
@@ -363,6 +362,7 @@ export default function ReportLost() {
             guest={guest}
             updateGuest={updateGuest}
             phoneError={phoneError}
+            emailError={emailError}
             needsProfilePhone={Boolean(profile) && !(profile?.phoneNumber || "").trim()}
             profilePhone={profilePhone}
             setProfilePhone={(v) => {
@@ -423,6 +423,7 @@ function FormView({
   guest,
   updateGuest,
   phoneError,
+  emailError,
   needsProfilePhone,
   profilePhone,
   setProfilePhone,
@@ -433,9 +434,21 @@ function FormView({
     <div className="animate-rise-in">
       <Link
         to="/report"
-        className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-primary mb-8 transition-colors"
+        className="
+          mb-8 inline-flex items-center gap-1.5
+          text-sm font-semibold text-muted-foreground/60
+          transition-colors duration-200
+          hover:text-primary
+          focus-visible:outline-none
+          focus-visible:text-primary
+          focus-visible:underline
+        "
       >
-        <ArrowLeft className={`size-4 ${dir === "rtl" ? "rotate-180" : ""}`} />
+        <ArrowUpRight
+          className={`size-3 ${dir === "rtl" ? "" : "-scale-x-100"}`}
+          strokeWidth={1.6}
+          aria-hidden="true"
+        />
         {t("backLabel")}
       </Link>
 
@@ -462,23 +475,14 @@ function FormView({
         className="bg-card border border-border rounded-[2rem] p-8 lg:p-12 shadow-soft space-y-8"
       >
         <Field label={t("fldDesc")} hint={t("aiSuggests")}>
-          <div className="relative">
-            <textarea
-              required
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("fldDescPh")}
-              rows={5}
-              className="w-full px-5 py-4 rounded-2xl bg-stone-50 border border-stone-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all resize-none"
-            />
-            <button
-              type="button"
-              className="absolute bottom-4 end-4 size-10 rounded-full bg-card border border-border grid place-items-center hover:bg-stone-100 transition-colors"
-              aria-label={t("voiceInputLabel")}
-            >
-              <Mic className="size-4 text-muted-foreground" />
-            </button>
-          </div>
+  <textarea
+    required
+    value={description}
+    onChange={(e) => setDescription(e.target.value)}
+    placeholder={t("fldDescPh")}
+    rows={5}
+    className="w-full px-5 py-4 rounded-2xl bg-stone-50 border border-stone-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all resize-none"
+  />
 
           {suggestions.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-3 animate-fade-up">
@@ -517,7 +521,7 @@ function FormView({
           </Field>
         </div>
 
-        <Field label={t("fldPhoto")}>
+        <Field label={`${t("fldPhoto")} (اختياري)`}>
           <label className="block relative rounded-2xl border-2 border-dashed border-stone-200 hover:border-primary/40 hover:bg-primary/[0.02] transition-colors cursor-pointer overflow-hidden">
             {preview ? (
               <img src={preview} alt="" className="w-full h-64 object-cover" />

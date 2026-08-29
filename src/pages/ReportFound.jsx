@@ -7,7 +7,7 @@ import {
   HeartHandshake,
   Gift,
   Users,
-  ArrowLeft,
+  ArrowUpRight,
   AlertCircle,
 } from "lucide-react";
 
@@ -270,14 +270,26 @@ export default function ReportFound() {
           <div className="animate-rise-in">
             <Link
               to="/report"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-accent-foreground mb-8 transition-colors"
+              className="
+                mb-8 inline-flex items-center gap-1.5
+                text-sm font-semibold text-muted-foreground/60
+                transition-colors duration-200
+                hover:text-primary
+                focus-visible:outline-none
+                focus-visible:text-primary
+                focus-visible:underline
+              "
             >
-              <ArrowLeft className={`size-4 ${dir === "rtl" ? "rotate-180" : ""}`} />
+              <ArrowUpRight
+                className={`size-3 ${dir === "rtl" ? "" : "-scale-x-100"}`}
+                strokeWidth={1.6}
+                aria-hidden="true"
+              />
               {t("backLabel")}
             </Link>
 
             <div className="mb-10">
-              <div className="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-accent-foreground font-bold mb-3">
+              <div className="inline-flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-accent font-bold mb-3">
                 <HeartHandshake className="size-3.5" />
                 {t("foundEyebrow")}
               </div>
@@ -334,13 +346,19 @@ export default function ReportFound() {
                   </Field>
                 </div>
 
-                <Field label={t("fldPhoto")}>
+                <Field
+          label={tr({
+            ar: "أضف صورة (اختياري)",
+            en: "Add a photo (optional)",
+            ur: "تصویر شامل کریں (اختیاری)",
+          })}
+        >
                   <label className="block relative rounded-2xl border-2 border-dashed border-stone-200 hover:border-accent/50 hover:bg-accent/[0.04] transition-colors cursor-pointer overflow-hidden">
                     {preview ? (
                       <img src={preview} alt="" className="w-full h-64 object-cover" />
                     ) : (
                       <div className="py-16 flex flex-col items-center gap-3">
-                        <div className="size-14 rounded-2xl bg-accent/15 text-accent-foreground grid place-items-center">
+                        <div className="size-14 rounded-2xl bg-accent/10 text-accent grid place-items-center">
                           <Upload className="size-6" strokeWidth={1.5} />
                         </div>
                         <p className="text-sm text-muted-foreground">{t("photoHint")}</p>
@@ -437,7 +455,7 @@ export default function ReportFound() {
               </div>
             </div>
 
-            <div className="text-[11px] font-mono uppercase tracking-widest text-accent-foreground font-bold mb-3">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-accent font-bold mb-3">
               {t("thanksLabel")}
             </div>
 
@@ -450,7 +468,7 @@ export default function ReportFound() {
             </p>
 
             <div className="inline-flex items-center gap-3 rounded-2xl border border-accent/20 bg-accent/5 px-6 py-4 mb-10">
-              <Users className="size-5 text-accent-foreground" />
+              <Users className="size-5 text-accent" />
               <span className="text-sm font-semibold">{t("reunitedCounter")}</span>
             </div>
 

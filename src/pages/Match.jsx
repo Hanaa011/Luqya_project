@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
-  ArrowRight,
+  ArrowUpRight,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -93,6 +93,7 @@ export default function Match() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const fromReportId = searchParams.get("from");
+  const fromSmartSearch = searchParams.get("source") === "smart-search";
   const alternativesRequested = searchParams.get("alternatives") === "1";
   const { t, tr, lang } = useI18n();
   const { profile, userId } = useAuth();
@@ -120,6 +121,7 @@ export default function Match() {
   // is no honest score to attach a new claim to, so the claim action is
   // simply not offered in that case - see the Phase 4 Part 5 report.
   const navScore = location.state?.scorePercentage;
+  const smartSearchState = location.state?.smartSearchState ?? null;
   const claimableScore = typeof navScore === "number" && Number.isFinite(navScore) ? navScore : null;
   const [claim, setClaim] = useState(null);
   const [openingConversation, setOpeningConversation] = useState(false);
@@ -575,6 +577,12 @@ export default function Match() {
     setClaim(null);
   }
 
+  function backToSmartSearch() {
+    navigate("/search", {
+      state: smartSearchState ? { restoreSmartSearch: smartSearchState } : undefined,
+    });
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 py-32 text-muted-foreground">
@@ -618,6 +626,33 @@ export default function Match() {
   return (
     <section className="py-8 sm:py-10 lg:py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        {fromSmartSearch && (
+          <button
+            type="button"
+            onClick={backToSmartSearch}
+            className="
+              mb-8 inline-flex items-center gap-1.5
+              text-sm font-semibold text-muted-foreground/60
+              transition-colors duration-200
+              hover:text-primary
+              focus-visible:outline-none
+              focus-visible:text-primary
+              focus-visible:underline
+            "
+          >
+            <ArrowUpRight
+              className={`size-3 ${lang === "ar" || lang === "ur" ? "" : "-scale-x-100"}`}
+              strokeWidth={1.6}
+              aria-hidden="true"
+            />
+            {copy(lang, {
+              ar: "العودة إلى نتائج البحث الذكي",
+              en: "Back to smart search results",
+              ur: "ذہین تلاش کے نتائج پر واپس جائیں",
+            })}
+          </button>
+        )}
+
         <div className={`mb-5 rounded-2xl border px-5 py-4 sm:px-6 ${typeTone}`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">

@@ -1,103 +1,157 @@
 import { User, Phone, Mail, ShieldCheck } from "lucide-react";
-import { PreferredContactType, preferredContactLabelKey } from "../api/enums";
 
-/**
- * Shared between ReportLost and ReportFound so the guest-contact UI (and
- * its validation/privacy copy) exists in exactly one place. Only rendered
- * when the visitor isn't authenticated — CreateReportDto ignores these
- * fields server-side for logged-in users.
- */
-export default function GuestContactFields({ t, tone = "primary", values, onChange, phoneError, emailError }) {
-  const ring = tone === "accent" ? "focus:border-accent focus:ring-accent/15" : "focus:border-primary focus:ring-primary/10";
-  const pillActive = tone === "accent" ? "bg-accent text-accent-foreground" : "bg-primary text-primary-foreground";
+export default function GuestContactFields({
+  t,
+  dir,
+  tone = "primary",
+  values,
+  onChange,
+  phoneError,
+  emailError,
+}) {
+  const focusTone =
+    tone === "accent"
+      ? "focus:border-accent/70 focus:ring-accent/10"
+      : "focus:border-primary/60 focus:ring-primary/10";
+
+  const iconTone =
+    tone === "accent"
+      ? "bg-accent/[0.08] text-accent"
+      : "bg-primary/[0.07] text-primary";
+
+  const inputBase = `
+    w-full rounded-xl border bg-background
+    px-4 py-3.5 text-sm text-foreground
+    outline-none transition-all duration-200
+    placeholder:text-muted-foreground/55
+    focus:ring-2
+  `;
 
   return (
-    <div className="space-y-5 rounded-[1.5rem] border border-dashed border-stone-200 p-6">
-      <div className="flex items-center gap-2">
-        <User className="size-4 text-muted-foreground" />
-        <div>
-          <div className="text-sm font-semibold">{t("guestInfoTitle")}</div>
-          <div className="text-xs text-muted-foreground">{t("guestInfoSub")}</div>
+    <section className="overflow-hidden rounded-[1.5rem] border border-border/80 bg-card">
+      {/* Header */}
+      <div className="flex items-start gap-3 border-b border-border/70 px-5 py-4 sm:px-6">
+        <span
+          className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl ${iconTone}`}
+        >
+          <User className="size-4" strokeWidth={1.8} />
+        </span>
+
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-foreground sm:text-base">
+            {t("guestInfoTitle")}
+          </h2>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+            {t("guestInfoSub")}
+          </p>
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs font-semibold flex items-center gap-1.5 mb-2">
-            <User className="size-3.5 text-muted-foreground" />
-            {t("fldFullName")}
-          </label>
-          <input
-            type="text"
-            required
-            value={values.reporterName}
-            onChange={(e) => onChange("reporterName", e.target.value)}
-            placeholder={t("fldFullNamePh")}
-            className={`w-full px-4 py-3 rounded-xl bg-card border border-stone-200 focus:outline-none focus:ring-2 transition-all text-sm ${ring}`}
-          />
+      {/* Fields */}
+      <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+        <div className="grid gap-5 md:grid-cols-2">
+          {/* Full name */}
+          <div>
+            <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-foreground/80">
+              <User className="size-3.5 text-muted-foreground" strokeWidth={1.8} />
+              {t("fldFullName")}
+            </label>
+
+            <input
+              type="text"
+              required
+              value={values.reporterName}
+              onChange={(e) => onChange("reporterName", e.target.value)}
+              placeholder={t("fldFullNamePh")}
+              className={`${inputBase} border-border/90 ${focusTone}`}
+            />
+          </div>
+
+          {/* Mobile */}
+          <div>
+            <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-foreground/80">
+              <Phone className="size-3.5 text-muted-foreground" strokeWidth={1.8} />
+              {t("fldMobile")}
+            </label>
+
+            <input
+              type="tel"
+              required
+              inputMode="tel"
+              dir="ltr"
+              value={values.reporterPhone}
+              onChange={(e) => onChange("reporterPhone", e.target.value)}
+              placeholder={t("fldMobilePh")}
+              aria-invalid={phoneError ? "true" : "false"}
+              className={`${inputBase} text-left ${
+                phoneError
+                  ? "border-error/70 focus:border-error focus:ring-error/10"
+                  : `border-border/90 ${focusTone}`
+              }`}
+            />
+
+            {phoneError && (
+              <p
+                className={`mt-1.5 text-[11px] font-medium text-error ${
+                  dir === "rtl" ? "text-right" : "text-left"
+                }`}
+              >
+                {t("fldMobileInvalid")}
+              </p>
+            )}
+          </div>
         </div>
 
+        {/* Email */}
         <div>
-          <label className="text-xs font-semibold flex items-center gap-1.5 mb-2">
-            <Phone className="size-3.5 text-muted-foreground" />
-            {t("fldMobile")}
+          <label className="mb-2 flex items-center gap-2 text-xs font-semibold text-foreground/80">
+            <Mail className="size-3.5 text-muted-foreground" strokeWidth={1.8} />
+            {t("emailPh")}
           </label>
+
           <input
-            type="tel"
+            type="email"
             required
             dir="ltr"
-            value={values.reporterPhone}
-            onChange={(e) => onChange("reporterPhone", e.target.value)}
-            placeholder={t("fldMobilePh")}
-            className={`w-full px-4 py-3 rounded-xl bg-card border text-start transition-all text-sm focus:outline-none focus:ring-2 ${ring} ${
-              phoneError ? "border-error" : "border-stone-200"
+            value={values.reporterEmail}
+            onChange={(e) => onChange("reporterEmail", e.target.value)}
+            placeholder="example@email.com"
+            aria-invalid={emailError ? "true" : "false"}
+            className={`${inputBase} ${
+              dir === "rtl"
+                ? "text-right placeholder:text-right"
+                : "text-left placeholder:text-left"
+            } ${
+              emailError
+                ? "border-error/70 focus:border-error focus:ring-error/10"
+                : `border-border/90 ${focusTone}`
             }`}
           />
-          {phoneError && <p className="text-xs text-error mt-1.5">{t("fldMobileInvalid")}</p>}
-        </div>
-      </div>
 
-      <div>
-        <label className="text-xs font-semibold flex items-center gap-1.5 mb-2">
-          <Mail className="size-3.5 text-muted-foreground" />
-          {t("fldEmail")}
-        </label>
-        <input
-          type="email"
-          required
-          dir="ltr"
-          value={values.reporterEmail}
-          onChange={(e) => onChange("reporterEmail", e.target.value)}
-          placeholder={t("fldEmailPh")}
-          className={`w-full px-4 py-3 rounded-xl bg-card border text-start transition-all text-sm focus:outline-none focus:ring-2 ${ring} ${
-            emailError ? "border-error" : "border-stone-200"
-          }`}
-        />
-        {emailError && <p className="text-xs text-error mt-1.5">{t("fldEmailInvalid")}</p>}
-      </div>
-
-      <div>
-        <label className="text-xs font-semibold block mb-2">{t("preferredContactLabel")}</label>
-        <div className="inline-flex p-1 bg-stone-100 rounded-full gap-1">
-          {[PreferredContactType.PHONE, PreferredContactType.EMAIL, PreferredContactType.WHATSAPP].map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onChange("preferredContact", option)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                values.preferredContact === option ? pillActive : "text-foreground/60 hover:text-foreground"
+          {emailError && (
+            <p
+              className={`mt-1.5 text-[11px] font-medium text-error ${
+                dir === "rtl" ? "text-right" : "text-left"
               }`}
             >
-              {t(preferredContactLabelKey(option))}
-            </button>
-          ))}
+              {dir === "rtl"
+                ? "أدخل بريدًا إلكترونيًا صحيحًا"
+                : "Enter a valid email address"}
+            </p>
+          )}
+        </div>
+
+        {/* Privacy note */}
+        <div className="flex items-start gap-2.5 rounded-xl bg-stone-50/70 px-3.5 py-3 text-[11px] leading-5 text-muted-foreground">
+          <ShieldCheck
+            className={`mt-0.5 size-3.5 shrink-0 ${
+              tone === "accent" ? "text-accent" : "text-primary"
+            }`}
+            strokeWidth={1.8}
+          />
+          <span>{t("privacyNotice")}</span>
         </div>
       </div>
-
-      <div className="flex items-start gap-2 text-xs text-muted-foreground pt-1 border-t border-stone-100">
-        <ShieldCheck className="size-3.5 shrink-0 mt-0.5" />
-        <span>{t("privacyNotice")}</span>
-      </div>
-    </div>
+    </section>
   );
 }

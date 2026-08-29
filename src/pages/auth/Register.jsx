@@ -150,8 +150,15 @@ export default function Register() {
     form.confirmPassword.length > 0 &&
     form.password === form.confirmPassword;
 
+  // Show the detailed checklist only while the user is actively editing
+  // a password that still needs work. Once it becomes valid, keep only a
+  // compact success state so the large panel does not keep reopening.
+  // Reveal the guidance as soon as the password field receives focus.
+  // Once the user has started typing, keep it visible so the layout stays stable.
+  const hasPasswordValue = Boolean(form.password);
+
   const showPasswordHelp =
-    passwordFocused || Boolean(form.password) || passwordError;
+    passwordFocused || hasPasswordValue;
 
   function update(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -262,13 +269,58 @@ export default function Register() {
       }[locale];
 
       if (err instanceof ApiError && err.isValidation) {
-        setError(
-          err.validationErrors.map((v) => v.message).join(" ") ||
-            err.message ||
-            fallback
-        );
+        const validationMessages = (err.validationErrors ?? [])
+          .map((item) => item?.message)
+          .filter(Boolean);
+
+        const serverText = [err.message, ...validationMessages]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        const accountAlreadyExists =
+          (serverText.includes("username") ||
+            serverText.includes("user name") ||
+            serverText.includes("email") ||
+            serverText.includes("e-mail")) &&
+          (serverText.includes("already") ||
+            serverText.includes("taken") ||
+            serverText.includes("registered") ||
+            serverText.includes("exists"));
+
+        if (accountAlreadyExists) {
+          setError(
+            uiCopy(locale, {
+              ar: "هذا البريد الإلكتروني مستخدم بالفعل. استخدم بريدًا آخر أو سجّل الدخول.",
+              en: "This email is already in use. Use another email or sign in.",
+              ur: "یہ ای میل پہلے سے استعمال ہو رہی ہے۔ دوسری ای میل استعمال کریں یا لاگ اِن کریں۔",
+            })
+          );
+        } else {
+          setError(validationMessages.join(" ") || err.message || fallback);
+        }
       } else {
-        setError(err.message || fallback);
+        const serverText = String(err?.message ?? "").toLowerCase();
+
+        const accountAlreadyExists =
+          (serverText.includes("username") ||
+            serverText.includes("user name") ||
+            serverText.includes("email") ||
+            serverText.includes("e-mail")) &&
+          (serverText.includes("already") ||
+            serverText.includes("taken") ||
+            serverText.includes("registered") ||
+            serverText.includes("exists"));
+
+        setError(
+          accountAlreadyExists
+            ? uiCopy(locale, {
+                ar: "هذا البريد الإلكتروني مستخدم بالفعل. استخدم بريدًا آخر أو سجّل الدخول.",
+                en: "This email is already in use. Use another email or sign in.",
+                ur: "یہ ای میل پہلے سے استعمال ہو رہی ہے۔ دوسری ای میل استعمال کریں یا لاگ اِن کریں۔",
+              })
+            : err.message || fallback
+        );
       }
     } finally {
       setLoading(false);
@@ -321,10 +373,19 @@ export default function Register() {
       {error && (
         <div
           role="alert"
-          className="mb-5 flex items-start gap-2.5 rounded-2xl border border-error/20 bg-error/5 px-4 py-3 text-sm text-error"
+          className="
+            mb-5 flex items-start gap-3 rounded-xl
+            border border-error/15 bg-error/[0.035]
+            px-4 py-3 text-start
+          "
         >
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>{error}</span>
+          <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-error/8 text-error">
+            <AlertCircle className="size-3.5" strokeWidth={1.8} />
+          </span>
+
+          <p className="min-w-0 pt-0.5 text-[13px] font-medium leading-6 text-error">
+            {error}
+          </p>
         </div>
       )}
 
@@ -433,73 +494,94 @@ export default function Register() {
             </button>
           </div>
 
+          {/* Smooth first reveal; layout stays stable after it appears. */}
           <div
-            className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+            className={`grid transition-[grid-template-rows,opacity,margin] duration-[560ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
               showPasswordHelp
-                ? "grid-rows-[1fr] opacity-100"
-                : "grid-rows-[0fr] opacity-0"
+                ? "mt-1.5 grid-rows-[1fr] opacity-100"
+                : "mt-0 grid-rows-[0fr] opacity-0"
             }`}
             aria-hidden={!showPasswordHelp}
           >
             <div className="min-h-0 overflow-hidden">
               <div
-                className={`rounded-xl border border-border/70 bg-stone-50/70 px-4 py-3 transition-transform duration-300 ease-out ${
-                  showPasswordHelp ? "translate-y-0" : "-translate-y-1"
+                className={`px-1 pt-1 transition-[transform,opacity] duration-[440ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                  showPasswordHelp
+                    ? "translate-y-0 opacity-100 delay-[80ms]"
+                    : "-translate-y-1 opacity-0 delay-0"
                 }`}
               >
-                <div className="mb-2 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{copy.strength}</span>
+                <div className="flex items-center gap-3">
+                  <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                    {copy.strength}
+                  </span>
+
+                  <div className="flex min-w-0 flex-1 gap-1" aria-hidden="true">
+                    {[1, 2, 3].map((step) => {
+                      const active =
+                        hasPasswordValue &&
+                        ((strength === "weak" && step === 1) ||
+                          (strength === "medium" && step <= 2) ||
+                          strength === "strong");
+
+                      return (
+                        <span
+                          key={step}
+                          className={`h-[2px] flex-1 rounded-full transition-colors duration-[360ms] ${
+                            active
+                              ? strength === "strong"
+                                ? "bg-success/75"
+                                : strength === "medium"
+                                  ? "bg-amber-500/80"
+                                  : "bg-error/75"
+                              : "bg-stone-200"
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+
                   <span
-                    className={`font-semibold transition-colors duration-200 ${
-                      strength === "strong"
-                        ? "text-success"
-                        : strength === "medium"
-                          ? "text-amber-600"
-                          : "text-muted-foreground"
+                    className={`shrink-0 text-[11px] font-semibold transition-colors duration-[360ms] ${
+                      !hasPasswordValue
+                        ? "text-muted-foreground/55"
+                        : strength === "strong"
+                          ? "text-success"
+                          : strength === "medium"
+                            ? "text-amber-600"
+                            : "text-error"
                     }`}
                   >
-                    {copy[strength]}
+                    {hasPasswordValue
+                      ? copy[strength]
+                      : uiCopy(locale, {
+                          ar: "ابدأ بالكتابة",
+                          en: "Start typing",
+                          ur: "لکھنا شروع کریں",
+                        })}
                   </span>
                 </div>
 
-                <div className="mb-3 flex gap-1">
-                  {[1, 2, 3].map((step) => (
-                    <span
-                      key={step}
-                      className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
-                        (strength === "weak" && step === 1) ||
-                        (strength === "medium" && step <= 2) ||
-                        strength === "strong"
-                          ? strength === "strong"
-                            ? "bg-success"
-                            : strength === "medium"
-                              ? "bg-amber-500"
-                              : "bg-muted-foreground/50"
-                          : "bg-stone-200"
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                <ul className="space-y-1.5">
+                <ul className="mt-3 grid gap-x-4 gap-y-1 sm:grid-cols-2">
                   {PASSWORD_RULES.map((rule) => {
                     const passed = passwordStatus.checks[rule.key];
 
                     return (
                       <li
                         key={rule.key}
-                        className={`flex items-center gap-2 text-xs transition-colors duration-200 ${
+                        className={`flex items-center gap-1.5 text-[11px] leading-5 transition-colors duration-[320ms] ${
                           passed
                             ? "text-success"
                             : passwordError
                               ? "text-error"
-                              : "text-muted-foreground"
+                              : "text-muted-foreground/75"
                         }`}
                       >
                         <Check
-                          className={`size-3.5 transition-all duration-200 ${
-                            passed ? "scale-100 opacity-100" : "scale-90 opacity-25"
+                          className={`size-3.5 shrink-0 transition-[opacity,color] duration-[320ms] ${
+                            passed ? "opacity-100" : "opacity-15"
                           }`}
+                          strokeWidth={1.8}
                         />
                         <span>{copy.requirements[rule.key]}</span>
                       </li>
@@ -508,7 +590,7 @@ export default function Register() {
                 </ul>
 
                 {passwordError && (
-                  <p role="alert" className="mt-2 text-xs font-medium text-error">
+                  <p role="alert" className="mt-2 text-[11px] font-medium text-error">
                     {copy.passwordInvalid}
                   </p>
                 )}
