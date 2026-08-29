@@ -155,6 +155,7 @@ jobs:
             docker run -d \
               --name luqya-api \
               --restart unless-stopped \
+              --network luqya-network \
               -p 8080:80 \
               --env-file /opt/projects/Leap/luqya-api.env \
               -e ASPNETCORE_FORWARDEDHEADERS_ENABLED=true \
@@ -187,6 +188,7 @@ jobs:
                 docker run -d \
                   --name luqya-api \
                   --restart unless-stopped \
+                  --network luqya-network \
                   -p 8080:80 \
                   --env-file /opt/projects/Leap/luqya-api.env \
                   -e ASPNETCORE_FORWARDEDHEADERS_ENABLED=true \
