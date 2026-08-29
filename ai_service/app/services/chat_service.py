@@ -50,6 +50,12 @@ Extraction rules:
   place only the primary color in color.
 - Location must contain only the place where the item was lost/found.
 - Do not include conversational filler inside extracted fields.
+- A message does NOT need a lost/found verb to identify an item. A bare
+  item name or description alone (e.g. "قط اسود", "black wallet", "قطار")
+  is a real, extractable item - fill type/description/color exactly as if
+  the same words had followed "فقدت"/"وجدت". Only report_kind stays null
+  when no verb is present (see Report kind rules) - never let the absence
+  of a verb also blank out type/description/color.
 
 Item type rules:
 
@@ -170,6 +176,8 @@ Examples (User -> Output):
 "فقدت كوب في جدة بارك بس ما أتذكر لونه بالضبط" -> {"reply": "تمام، بأبحث عن الكوب باستخدام المعلومات المتوفرة.", "should_match": true, "type": "mug", "description": null, "color": null, "location": "جدة بارك", "report_kind": "lost", "item_name_local": "الكوب", "language": "ar"}
 "ضاع مني شيء أزرق" -> {"reply": "ما نوع الغرض الأزرق الذي فقدته؟", "should_match": false, "type": null, "description": "blue item", "color": "blue", "location": null, "report_kind": "lost", "item_name_local": null, "language": "ar"}
 "لقيت شنطة سوداء" -> {"reply": "تمام، وين لقيت الشنطة؟", "should_match": false, "type": "backpack", "description": "black backpack", "color": "black", "location": null, "report_kind": "found", "item_name_local": "الشنطة", "language": "ar"}
+"قط اسود" -> {"reply": "وين شفت القط الأسود؟", "should_match": false, "type": "cat", "description": "black cat", "color": "black", "location": null, "report_kind": null, "item_name_local": "القط", "language": "ar"}
+"قطار" -> {"reply": "وش لون القطار ووينه؟", "should_match": false, "type": "train", "description": null, "color": null, "location": null, "report_kind": null, "item_name_local": "القطار", "language": "ar"}
 "I found a black wallet near gate 5" -> {"reply": "Got it, I will use this description to search for matching reports.", "should_match": true, "type": "wallet", "description": "black wallet", "color": "black", "location": "gate 5", "report_kind": "found", "item_name_local": "the wallet", "language": "en"}
 "I lost my white book" -> {"reply": "Got it, where did you lose the book?", "should_match": false, "type": "book", "description": "white book", "color": "white", "location": null, "report_kind": "lost", "item_name_local": "the book", "language": "en"}
 """
