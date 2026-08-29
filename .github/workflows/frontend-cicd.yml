@@ -35,7 +35,13 @@ jobs:
         run: |
           tar -czf frontend-dist.tar.gz -C dist .
 
-      # 6. رفع ملفات Frontend للسيرفر
+      # 6. اختبار اتصال SSH قبل محاولة SCP
+      - name: Test SSH connectivity
+        run: |
+          echo "Testing SSH connectivity to server..."
+          nc -vz -w 10 "${{ secrets.SERVER_HOST }}" 22   
+
+      # 7. رفع ملفات Frontend للسيرفر
       - name: Copy Frontend to Server
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -48,7 +54,7 @@ jobs:
           timeout: 120s
           command_timeout: 10m
 
-      # 7. نشر Frontend على السيرفر
+      # 8. نشر Frontend على السيرفر
       - name: Deploy Frontend
         uses: appleboy/ssh-action@v1.0.3
         with:
