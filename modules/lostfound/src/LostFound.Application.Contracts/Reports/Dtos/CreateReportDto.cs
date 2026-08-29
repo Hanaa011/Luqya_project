@@ -33,6 +33,13 @@ namespace LostFound.Reports.Dtos
         // ---- Guest-only contact info (ignored for authenticated users) ----
         public string? ReporterName { get; set; }
         public string? ReporterPhone { get; set; }
+
+        // Required for guest submissions (ReportAppService.CreateAsync
+        // enforces this - it can't be a plain [Required] here since an
+        // authenticated user is never required to supply one). [EmailAddress]
+        // only validates format when a value is present, so it's harmless
+        // for the authenticated path too.
+        [EmailAddress]
         public string? ReporterEmail { get; set; }
         public PreferredContactType PreferredContact { get; set; } = PreferredContactType.Phone;
     }

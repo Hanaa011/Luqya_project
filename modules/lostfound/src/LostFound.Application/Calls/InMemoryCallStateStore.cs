@@ -36,8 +36,18 @@ namespace LostFound.Calls
 
         private readonly ConcurrentDictionary<Guid, ActiveCall> _calls = new();
 
-        public ActiveCall? Get(Guid conversationId)
+        public ActiveCall? Get(Guid conversationId) => Get(conversationId, out _);
+
+        // justMissed is set exactly once per call (TryRemove only succeeds
+        // for the single caller that wins the race, so two near-
+        // simultaneous polls can never both observe a miss for the same
+        // CallId) - the caller uses it to fire the missed-call
+        // notification/email exactly once. See
+        // ConversationAppService.MapActiveCallToDto.
+        public ActiveCall? Get(Guid conversationId, out ActiveCall? justMissed)
         {
+            justMissed = null;
+
             if (!_calls.TryGetValue(conversationId, out var call))
             {
                 return null;
@@ -45,7 +55,11 @@ namespace LostFound.Calls
 
             if (call.State == CallState.Ringing && DateTime.UtcNow - call.StartedAtUtc > RingTimeout)
             {
-                _calls.TryRemove(conversationId, out _);
+                if (_calls.TryRemove(conversationId, out var removed))
+                {
+                    justMissed = removed;
+                }
+
                 return null;
             }
 

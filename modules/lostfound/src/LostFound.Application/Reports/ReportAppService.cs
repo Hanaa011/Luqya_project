@@ -281,6 +281,15 @@ namespace LostFound.Reports
                     throw new BusinessException(ReporterErrorCodes.PhoneIsRequiredForGuests);
                 }
 
+                // The guest-claim flow (ConversationAppService.OpenAsync)
+                // can only ever reach a guest via email - no SMS channel
+                // exists - so a guest report with no email would be
+                // permanently unclaimable once someone says "this is mine".
+                if (string.IsNullOrWhiteSpace(input.ReporterEmail))
+                {
+                    throw new BusinessException(ReporterErrorCodes.EmailIsRequiredForGuests);
+                }
+
                 reporter = await _reporterManager.FindOrCreateForGuestAsync(
                     input.ReporterName,
                     input.ReporterPhone,

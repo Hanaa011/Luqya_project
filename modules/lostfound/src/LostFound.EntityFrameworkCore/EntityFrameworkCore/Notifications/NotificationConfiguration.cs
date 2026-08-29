@@ -16,10 +16,17 @@ namespace LostFound.EntityFrameworkCore
                 b.ConfigureByConvention();
                 b.Property(x => x.Title).HasMaxLength(NotificationConsts.MaxTitleLength);
 
-                b.HasOne<Reporter>().WithMany().HasForeignKey(x => x.ReporterId).OnDelete(DeleteBehavior.Restrict).IsRequired();
+                // ReporterId is now optional - an IdentityUserId-only row
+                // (e.g. a missed-call notification) has no Reporter at all.
+                b.HasOne<Reporter>().WithMany().HasForeignKey(x => x.ReporterId).OnDelete(DeleteBehavior.Restrict);
                 b.HasOne<Report>().WithMany().HasForeignKey(x => x.ReportId).OnDelete(DeleteBehavior.Restrict).IsRequired();
 
+                // IdentityUserId is a plain column (no cross-module FK) -
+                // same convention as Reporter.IdentityUserId.
+                b.Property(x => x.IdentityUserId);
+
                 b.HasIndex(x => x.ReporterId);
+                b.HasIndex(x => x.IdentityUserId);
             });
         }
     }

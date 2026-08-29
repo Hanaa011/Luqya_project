@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Authorization;
+using LostFound.Conversations;
 using LostFound.Matches;
 using LostFound.Reports;
 using LostFound.Reporters.Dtos;
@@ -28,6 +29,7 @@ namespace LostFound.Reporters
         private readonly IReportRepository _reportRepository;
         private readonly IMatchRepository _matchRepository;
         private readonly IReportClaimRepository _reportClaimRepository;
+        private readonly IConversationRepository _conversationRepository;
         private readonly ReporterManager _reporterManager;
 
         public ReporterAppService(
@@ -35,12 +37,14 @@ namespace LostFound.Reporters
             IReportRepository reportRepository,
             IMatchRepository matchRepository,
             IReportClaimRepository reportClaimRepository,
+            IConversationRepository conversationRepository,
             ReporterManager reporterManager)
         {
             _reporterRepository = reporterRepository;
             _reportRepository = reportRepository;
             _matchRepository = matchRepository;
             _reportClaimRepository = reportClaimRepository;
+            _conversationRepository = conversationRepository;
             _reporterManager = reporterManager;
         }
 
@@ -191,8 +195,48 @@ namespace LostFound.Reporters
             }
 
             var reporter = await _reporterManager.ClaimGuestReportAsync(input.Token, CurrentUser.Id.Value);
+            var conversationId = await TryOpenClaimedConversationAsync(reporter.Id, CurrentUser.Id.Value);
 
-            return new ConfirmReporterClaimResultDto { ReporterId = reporter.Id };
+            return new ConfirmReporterClaimResultDto { ReporterId = reporter.Id, ConversationId = conversationId };
+        }
+
+        // After the guest links their account, resume the conversation
+        // with whoever claimed "this is my item" against one of their
+        // reports - so ClaimReport.jsx can open it automatically instead
+        // of sending them to find the report and click through again.
+        // Picks the most recent IsMine=true claim across all of this
+        // reporter's reports; null (no auto-open, just a plain success
+        // state) when nobody has claimed anything yet.
+        private async Task<Guid?> TryOpenClaimedConversationAsync(Guid reporterId, Guid claimedUserId)
+        {
+            var reportQueryable = await _reportRepository.GetQueryableAsync();
+            var reportIds = reportQueryable.Where(r => r.ReporterId == reporterId).Select(r => r.Id);
+
+            var claimQueryable = await _reportClaimRepository.GetQueryableAsync();
+            var latestClaim = await AsyncExecuter.FirstOrDefaultAsync(
+                claimQueryable
+                    .Where(c => reportIds.Contains(c.ReportId) && c.IsMine)
+                    .OrderByDescending(c => c.CreationTime));
+
+            if (latestClaim == null)
+            {
+                return null;
+            }
+
+            var (participant1Id, participant2Id) = claimedUserId.CompareTo(latestClaim.ClaimantUserId) <= 0
+                ? (claimedUserId, latestClaim.ClaimantUserId)
+                : (latestClaim.ClaimantUserId, claimedUserId);
+
+            var conversation = await _conversationRepository.FindByReportAndParticipantsAsync(
+                latestClaim.ReportId, participant1Id, participant2Id);
+
+            if (conversation == null)
+            {
+                conversation = new Conversation(GuidGenerator.Create(), latestClaim.ReportId, participant1Id, participant2Id);
+                await _conversationRepository.InsertAsync(conversation);
+            }
+
+            return conversation.Id;
         }
     }
 }

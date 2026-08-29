@@ -13,5 +13,6 @@ namespace LostFound.Reporters
         // another account" check - do not reuse it here.
         public const string ClaimTokenInvalid = Prefix + "0005";
         public const string ReporterAlreadyLinked = Prefix + "0006";
+        public const string EmailIsRequiredForGuests = Prefix + "0007";
     }
 }

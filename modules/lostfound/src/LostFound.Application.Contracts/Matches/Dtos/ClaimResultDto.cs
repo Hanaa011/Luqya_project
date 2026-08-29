@@ -13,5 +13,12 @@ namespace LostFound.Matches.Dtos
         public MatchDto? Match { get; set; }
 
         public bool ContactAccessGranted { get; set; }
+
+        // True when this exact (report, caller) pair already had a
+        // "this is my item" claim before this call - the guest contact-
+        // request email is never resent for a repeat click; the frontend
+        // uses this to show "a contact request was already sent" instead
+        // of implying a brand-new one just went out.
+        public bool AlreadyRequested { get; set; }
     }
 }

@@ -2,13 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
+using System.Net;
+using System.Net.Mail;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Authorization;
+using Volo.Abp.Emailing;
 using LostFound.AI.Core;
 using LostFound.Matches.Dtos;
+using LostFound.Reporters;
 using LostFound.Reports;
 
 namespace LostFound.Matches
@@ -18,6 +23,9 @@ namespace LostFound.Matches
         private readonly IMatchRepository _matchRepository;
         private readonly IReportRepository _reportRepository;
         private readonly IReportClaimRepository _reportClaimRepository;
+        private readonly IReporterRepository _reporterRepository;
+        private readonly ReporterManager _reporterManager;
+        private readonly IEmailSender _emailSender;
         private readonly MatchManager _matchManager;
         private readonly IEmbeddingEngine _embeddingEngine;
         private readonly IConfiguration _configuration;
@@ -26,6 +34,9 @@ namespace LostFound.Matches
             IMatchRepository matchRepository,
             IReportRepository reportRepository,
             IReportClaimRepository reportClaimRepository,
+            IReporterRepository reporterRepository,
+            ReporterManager reporterManager,
+            IEmailSender emailSender,
             MatchManager matchManager,
             IEmbeddingEngine embeddingEngine,
             IConfiguration configuration)
@@ -33,6 +44,9 @@ namespace LostFound.Matches
             _matchRepository = matchRepository;
             _reportRepository = reportRepository;
             _reportClaimRepository = reportClaimRepository;
+            _reporterRepository = reporterRepository;
+            _reporterManager = reporterManager;
+            _emailSender = emailSender;
             _matchManager = matchManager;
             _embeddingEngine = embeddingEngine;
             _configuration = configuration;
@@ -128,10 +142,26 @@ namespace LostFound.Matches
             // immediate contact access.
             if (!input.OwnReportId.HasValue)
             {
-                await _matchManager.GetOrCreateReportClaimAsync(
+                var (_, isNewClaim) = await _matchManager.GetOrCreateReportClaimAsync(
                     input.SearchResultReportId, CurrentUser.Id.Value, isMine: true, input.ObservedScorePercentage);
 
-                return new ClaimResultDto { Match = null, ContactAccessGranted = true };
+                // Guest contact-request email: gated on isNewClaim, which is
+                // keyed by (ReportId, ClaimantUserId) - the SAME requester
+                // clicking again on the SAME report never re-sends (this
+                // branch is skipped entirely); a DIFFERENT requester, or the
+                // SAME requester on a DIFFERENT report, is always a fresh
+                // (report, claimant) pair and always gets their own email.
+                // Scope note: this only covers the no-own-report path above
+                // (this session's actual "This is my item" flow) - the
+                // separate has-an-own-report -> real Match -> AcceptAsync
+                // path below is untouched, per its own existing
+                // NotifyMatchDecisionAsync notification flow.
+                if (isNewClaim)
+                {
+                    await SendGuestContactRequestEmailIfNeededAsync(input.SearchResultReportId);
+                }
+
+                return new ClaimResultDto { Match = null, ContactAccessGranted = true, AlreadyRequested = !isNewClaim };
             }
 
             var ownReport = await _reportRepository.GetAsync(input.OwnReportId.Value);
@@ -152,6 +182,102 @@ namespace LostFound.Matches
             // was needed.
             var accepted = await AcceptAsync(match.Id);
             return new ClaimResultDto { Match = accepted, ContactAccessGranted = true };
+        }
+
+        // Only fires for a genuinely guest-owned report (reporter has no
+        // linked account yet) with an email on file - a registered owner
+        // already gets the existing in-app Notification above instead.
+        // Issues its own fresh, independent claim token every time (see
+        // ReporterManager.IssueClaimTokenForRequestAsync) rather than
+        // reusing ConversationAppService's reporter-scoped one, precisely
+        // so a second, different requester on the same still-unclaimed
+        // reporter gets their own working link even while an earlier
+        // requester's token is still valid. Best-effort: a delivery
+        // failure must not break the claim itself.
+        private async Task SendGuestContactRequestEmailIfNeededAsync(Guid reportId)
+        {
+            var report = await _reportRepository.GetAsync(reportId);
+            var reporter = await _reporterRepository.GetAsync(report.ReporterId);
+
+            if (reporter.IdentityUserId != null || string.IsNullOrWhiteSpace(reporter.Email))
+            {
+                return;
+            }
+
+            var rawToken = await _reporterManager.IssueClaimTokenForRequestAsync(reporter.Id);
+            var claimUrl = $"{_configuration["App:AngularUrl"]?.TrimEnd('/')}/claim/{rawToken}";
+            const string subject = "Someone wants to contact you about your Luqya report";
+
+            using var message = new MailMessage { Subject = subject, Body = BuildContactRequestPlainText(claimUrl), IsBodyHtml = false };
+            message.To.Add(reporter.Email);
+            message.AlternateViews.Add(
+                AlternateView.CreateAlternateViewFromString(BuildContactRequestHtml(claimUrl), null, "text/html"));
+
+            try
+            {
+                await _emailSender.SendAsync(message, normalize: true);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to send guest contact-request email.");
+            }
+        }
+
+        private static string BuildContactRequestPlainText(string claimUrl) =>
+            "Someone on Luqya believes a report you submitted may be theirs, and would like to contact you about it. " +
+            $"To let them message you, verify it's yours: {claimUrl}\n\n" +
+            "This link works once and expires in 60 minutes. If you didn't submit a report on Luqya, " +
+            "you can ignore this email.";
+
+        // Same table-based, inline-styled layout as
+        // ConversationAppService's claim email - kept as its own small,
+        // self-contained copy rather than a shared helper, so this change
+        // stays fully localized to MatchAppService.
+        private static string BuildContactRequestHtml(string claimUrl)
+        {
+            var encodedUrl = WebUtility.HtmlEncode(claimUrl);
+
+            return $$"""
+                <!DOCTYPE html>
+                <html lang="en" dir="ltr">
+                <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+                <body style="margin:0;padding:0;background-color:#f4f4f2;font-family:Segoe UI,Helvetica,Arial,sans-serif;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f2;padding:24px 0;">
+                    <tr><td align="center">
+                      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+                        <tr><td style="background-color:#0d7a6f;padding:20px 32px;">
+                          <span style="font-size:20px;font-weight:700;color:#ffffff;">Luqya</span>
+                        </td></tr>
+                        <tr><td style="padding:32px;">
+                          <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#1f2937;">
+                            Someone on Luqya believes a report you submitted may belong to them, and would like to
+                            contact you about it.
+                          </p>
+                          <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#1f2937;">
+                            Confirm the report is yours to start a private conversation with them right here on Luqya.
+                          </p>
+                          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 24px auto;">
+                            <tr><td align="center" style="border-radius:12px;background-color:#0d7a6f;">
+                              <a href="{{encodedUrl}}" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">
+                                تأكيد البلاغ والتواصل
+                              </a>
+                            </td></tr>
+                          </table>
+                          <p style="margin:0 0 16px 0;font-size:13px;line-height:1.5;color:#6b7280;">
+                            This link works once and expires in 60 minutes.
+                          </p>
+                          <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;">
+                          <p style="margin:0;font-size:12px;line-height:1.5;color:#9ca3af;">
+                            If you didn't submit a report on Luqya, you can safely ignore this email - no account or
+                            report will be linked without confirming this link yourself.
+                          </p>
+                        </td></tr>
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """;
         }
 
         // Phase 4 Part 8 (Task B, point 4): the report ids the current

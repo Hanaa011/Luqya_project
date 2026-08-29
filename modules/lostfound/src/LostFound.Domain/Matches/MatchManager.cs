@@ -264,7 +264,15 @@ namespace LostFound.Matches
         // user first said "not mine", later decides it actually is)
         // updates the existing row rather than accumulating a second one,
         // since a user's disposition toward a given report is singular.
-        public async Task<ReportClaim> GetOrCreateReportClaimAsync(
+        // isNewClaim distinguishes a genuinely first-time (report, claimant)
+        // pair from a repeat call that just re-confirms the same
+        // disposition - MatchAppService uses it to decide whether a guest
+        // contact-request email needs sending (never resend for a repeat
+        // click - see ClaimResultDto.AlreadyRequested) and to know it must
+        // NOT resend for an existing-but-changed disposition either
+        // (isMine flipped from false to true), which reuses the existing
+        // row rather than counting as "new".
+        public async Task<(ReportClaim Claim, bool IsNewClaim)> GetOrCreateReportClaimAsync(
             Guid reportId, Guid claimantUserId, bool isMine, double observedScorePercentage)
         {
             var claimedReport = await _reportRepository.GetAsync(reportId);
@@ -274,12 +282,12 @@ namespace LostFound.Matches
             {
                 if (existing.IsMine == isMine)
                 {
-                    return existing;
+                    return (existing, false);
                 }
 
                 existing.UpdateDisposition(isMine, (decimal)observedScorePercentage);
                 await _reportClaimRepository.UpdateAsync(existing, autoSave: true);
-                return existing;
+                return (existing, false);
             }
 
             var claim = new ReportClaim(GuidGenerator.Create(), reportId, claimantUserId, isMine, (decimal)observedScorePercentage);
@@ -298,7 +306,7 @@ namespace LostFound.Matches
                 );
             }
 
-            return claim;
+            return (claim, true);
         }
 
         public async Task NotifyMatchDecisionAsync(Match match, bool accepted)

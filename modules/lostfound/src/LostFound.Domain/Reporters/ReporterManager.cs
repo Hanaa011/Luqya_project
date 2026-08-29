@@ -88,6 +88,31 @@ namespace LostFound.Reporters
             return rawToken;
         }
 
+        // Always issues a fresh, independent token - unlike
+        // IssueClaimTokenIfNeededAsync above, this does NOT check for an
+        // already-valid one first. Used only where the CALLER already
+        // guarantees its own once-per-request dedup (MatchManager's
+        // per-(report, claimant) ReportClaim check) - a second, different
+        // requester contacting the same guest reporter must get their own
+        // working link even while an earlier requester's token is still
+        // outstanding. Multiple valid tokens for one reporter is safe:
+        // every one of them still only leads to linking THIS reporter to
+        // whichever account redeems it first (see ClaimGuestReportAsync's
+        // already-linked guard below) - it's the same guarantee as a
+        // single reused link, just with more than one valid envelope.
+        public async Task<string> IssueClaimTokenForRequestAsync(Guid reporterId)
+        {
+            var now = Clock.Now;
+
+            var rawToken = GenerateRawToken();
+            var token = new ReporterClaimToken(
+                GuidGenerator.Create(), reporterId, HashToken(rawToken), now.Add(ClaimTokenLifetime));
+
+            await _reporterClaimTokenRepository.InsertAsync(token);
+
+            return rawToken;
+        }
+
         public async Task<Reporter> ClaimGuestReportAsync(string rawToken, Guid identityUserId)
         {
             var token = await _reporterClaimTokenRepository.FindByTokenHashAsync(HashToken(rawToken))
