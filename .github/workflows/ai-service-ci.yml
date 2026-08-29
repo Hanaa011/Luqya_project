@@ -190,13 +190,12 @@ jobs:
             docker exec luqya-ai-api sh -c \
               'printenv | grep -E "^BACKEND_API_URL|^ALLOWED_ORIGINS" ; printenv | grep -q "^OPENAI_API_KEY=" && echo "OPENAI_API_KEY=SET"'
 
-            echo "========================================"
+                       echo "========================================"
             echo "Checking AI service health..."
             echo "========================================"
 
-            docker exec luqya-api sh -c \
-              'python -c "import urllib.request; print(urllib.request.urlopen(\"http://luqya-ai-api:8000/health\", timeout=10).read().decode())"'
-
+            docker exec luqya-ai-api sh -c \
+              'python3 -c "import urllib.request; print(urllib.request.urlopen(\"http://127.0.0.1:8000/health\", timeout=10).read().decode())"'
             echo "========================================"
             echo "Checking container logs..."
             echo "========================================"
