@@ -31,9 +31,19 @@ export default function ClaimReport() {
     let cancelled = false;
 
     confirmReporterClaim(token)
-      .then(() => {
+      .then((result) => {
         if (cancelled) return;
         setStatus("success");
+
+        // Someone already claimed "this is my item" against this report -
+        // resume that conversation automatically instead of leaving the
+        // guest to find it themselves. No conversationId (nobody has
+        // claimed yet) just leaves the plain success state below in place.
+        if (result?.conversationId) {
+          window.setTimeout(() => {
+            if (!cancelled) navigate(`/messages/${result.conversationId}`, { replace: true });
+          }, 900);
+        }
       })
       .catch((err) => {
         if (cancelled) return;

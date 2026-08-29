@@ -393,10 +393,9 @@ export default function SmartSearch() {
             <DammaMark className="size-3.5" />
             {t("navSearch")}
           </div>
-          <h1 className="font-display text-4xl lg:text-5xl font-extrabold tracking-tight mb-3">
+          <h1 className="font-display text-4xl lg:text-5xl font-extrabold tracking-tight">
             {t("searchTitle")}
           </h1>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">{t("searchSub")}</p>
         </div>
 
         <form onSubmit={runSearch} className="bg-card border border-border rounded-[2rem] p-6 lg:p-8 shadow-soft">

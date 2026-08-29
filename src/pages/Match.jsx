@@ -9,6 +9,7 @@ import {
   Clock3,
   ExternalLink,
   Loader2,
+  MailCheck,
   MapPin,
   MessageCircle,
   PackageCheck,
@@ -430,6 +431,12 @@ export default function Match() {
         // match in either party's Dashboard (there's no second report to
         // pair it with), unlike the full-Match path above it.
         setClaim({ action, status: "success", noOwnReport: !result?.match });
+        // MatchAppService.ClaimAsync's own answer for "did a contact-
+        // request email just go out, or had this exact requester already
+        // sent one for this exact report" - carried through to the
+        // pending-claim panel below so it can say the right thing instead
+        // of always implying a fresh email.
+        const alreadyRequested = Boolean(result?.alreadyRequested);
         // Privacy-preserving communication: contact access no longer means
         // a phone/email page - it opens (or reuses) a private in-platform
         // conversation instead. The pause is purely so the success state
@@ -443,19 +450,18 @@ export default function Match() {
             // still a guest (no account yet). ConversationAppService
             // .OpenAsync already emailed them a claim-verification link
             // (idempotently - it won't resend one while a still-valid link
-            // is pending) - this is an expected, distinct outcome, not a
-            // generic failure.
-            const pendingClaim = err instanceof ApiError && err.code === "LostFound:Reporter:0003";
+            // is pending). This is an expected, positive outcome (not a
+            // failure), so it gets its own status/panel rather than
+            // reusing the generic error look.
+            if (err instanceof ApiError && err.code === "LostFound:Reporter:0003") {
+              setClaim({ action, status: "pending-claim", alreadyRequested });
+              return;
+            }
+
             setClaim({
               action,
               status: "error",
               error:
-                (pendingClaim &&
-                  tr({
-                    ar: "صاحب البلاغ لم يُنشئ حسابًا بعد. أرسلنا له رابط تحقق عبر البريد الإلكتروني - ستتمكن من مراسلته هنا فور تأكيده.",
-                    en: "The reporter hasn't registered an account yet. We've emailed them a verification link - you'll be able to message them here once they confirm.",
-                    ur: "رپورٹر نے ابھی اکاؤنٹ نہیں بنایا۔ ہم نے انہیں تصدیقی لنک ای میل کر دیا ہے - تصدیق کے بعد آپ یہاں ان سے بات کر سکیں گے۔",
-                  })) ||
                 err.message ||
                 tr({
                   ar: "تعذّر فتح المحادثة. حاول مرة أخرى.",
@@ -1001,7 +1007,7 @@ function MetaItem({ Icon, label, value }) {
 // natural next step after reviewing this report's own details, rather
 // than a repeat of the old inline search-result buttons.
 function ClaimAction({ t, tr, claim, onStart, onSelectReport, onConfirm, onCancel }) {
-  const busy = claim && !["error", "confirming", "picking"].includes(claim.status);
+  const busy = claim && !["error", "pending-claim", "confirming", "picking"].includes(claim.status);
 
   return (
     <div>
@@ -1197,6 +1203,31 @@ function ClaimPanel({ claim, tr, onSelectReport, onConfirm, onCancel }) {
             </Link>
           </p>
         )}
+      </div>
+    );
+  }
+
+  // The report's original reporter is still a guest - not a failure, a
+  // pending step. Deliberately styled like the success state (success-tint,
+  // no red/error tone) so it reads as "on its way," not "something broke."
+  // Never shows the guest's email/phone - only that a link was sent.
+  if (claim.status === "pending-claim") {
+    return (
+      <div className="mt-3 flex items-start gap-2.5 rounded-2xl bg-success-tint px-4 py-3.5">
+        <MailCheck className="size-4 shrink-0 mt-0.5 text-success" />
+        <p className="text-xs leading-relaxed text-success">
+          {claim.alreadyRequested
+            ? tr({
+                ar: "سبق أن أُرسل رابط تحقق إلى صاحب البلاغ عبر البريد الإلكتروني. بعد إنشاء حسابه وتأكيد البلاغ، ستتمكن من التواصل معه مباشرة عبر المحادثة.",
+                en: "A verification link was already emailed to the report owner. Once they create an account and confirm the report, you'll be able to message them directly here.",
+                ur: "رپورٹ کے مالک کو ای میل کے ذریعے تصدیقی لنک پہلے ہی بھیجا جا چکا ہے۔ اکاؤنٹ بنانے اور رپورٹ کی تصدیق کے بعد، آپ یہاں براہ راست ان سے بات کر سکیں گے۔",
+              })
+            : tr({
+                ar: "تم إرسال رابط تحقق إلى صاحب البلاغ عبر البريد الإلكتروني. بعد إنشاء حسابه وتأكيد البلاغ، ستتمكن من التواصل معه مباشرة عبر المحادثة.",
+                en: "A verification link has been emailed to the report owner. Once they create an account and confirm the report, you'll be able to message them directly here.",
+                ur: "رپورٹ کے مالک کو ای میل کے ذریعے تصدیقی لنک بھیج دیا گیا ہے۔ اکاؤنٹ بنانے اور رپورٹ کی تصدیق کے بعد، آپ یہاں براہ راست ان سے بات کر سکیں گے۔",
+              })}
+        </p>
       </div>
     );
   }

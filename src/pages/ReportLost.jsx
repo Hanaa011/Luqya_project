@@ -26,6 +26,7 @@ import { reportHeadingTitle } from "../lib/reportTitle";
 import { ReportType, PreferredContactType } from "../api/enums";
 import { ApiError } from "../api/httpClient";
 import { isValidSaudiMobile } from "../lib/saudiPhone";
+import { isValidEmail } from "../lib/email";
 import { setKnownReporterId } from "../api/reporterIdentity";
 import { fetchMyReports } from "../lib/myReports";
 import { buildReporterFields } from "../lib/reporterFields";
@@ -94,6 +95,7 @@ export default function ReportLost() {
     preferredContact: PreferredContactType.PHONE,
   });
   const [phoneError, setPhoneError] = useState(false);
+  const [emailError, setEmailError] = useState(false);
   const [profilePhone, setProfilePhone] = useState("");
   const [profilePhoneError, setProfilePhoneError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -153,6 +155,7 @@ export default function ReportLost() {
   function updateGuest(field, value) {
     setGuest((g) => ({ ...g, [field]: value }));
     if (field === "reporterPhone") setPhoneError(false);
+    if (field === "reporterEmail") setEmailError(false);
   }
 
   async function resolveLocationId(placeName) {
@@ -171,6 +174,11 @@ export default function ReportLost() {
 
     if (!profile && !isValidSaudiMobile(guest.reporterPhone)) {
       setPhoneError(true);
+      return;
+    }
+
+    if (!profile && !isValidEmail(guest.reporterEmail)) {
+      setEmailError(true);
       return;
     }
 
@@ -522,7 +530,14 @@ function FormView({
         </Field>
 
         {isGuest && (
-          <GuestContactFields t={t} tone="primary" values={guest} onChange={updateGuest} phoneError={phoneError} />
+          <GuestContactFields
+            t={t}
+            tone="primary"
+            values={guest}
+            onChange={updateGuest}
+            phoneError={phoneError}
+            emailError={emailError}
+          />
         )}
 
         {needsProfilePhone && (

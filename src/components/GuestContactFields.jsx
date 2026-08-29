@@ -7,7 +7,7 @@ import { PreferredContactType, preferredContactLabelKey } from "../api/enums";
  * when the visitor isn't authenticated — CreateReportDto ignores these
  * fields server-side for logged-in users.
  */
-export default function GuestContactFields({ t, tone = "primary", values, onChange, phoneError }) {
+export default function GuestContactFields({ t, tone = "primary", values, onChange, phoneError, emailError }) {
   const ring = tone === "accent" ? "focus:border-accent focus:ring-accent/15" : "focus:border-primary focus:ring-primary/10";
   const pillActive = tone === "accent" ? "bg-accent text-accent-foreground" : "bg-primary text-primary-foreground";
 
@@ -60,14 +60,20 @@ export default function GuestContactFields({ t, tone = "primary", values, onChan
       <div>
         <label className="text-xs font-semibold flex items-center gap-1.5 mb-2">
           <Mail className="size-3.5 text-muted-foreground" />
-          {t("fldEmailOptional")}
+          {t("fldEmail")}
         </label>
         <input
           type="email"
+          required
+          dir="ltr"
           value={values.reporterEmail}
           onChange={(e) => onChange("reporterEmail", e.target.value)}
-          className={`w-full px-4 py-3 rounded-xl bg-card border border-stone-200 focus:outline-none focus:ring-2 transition-all text-sm ${ring}`}
+          placeholder={t("fldEmailPh")}
+          className={`w-full px-4 py-3 rounded-xl bg-card border text-start transition-all text-sm focus:outline-none focus:ring-2 ${ring} ${
+            emailError ? "border-error" : "border-stone-200"
+          }`}
         />
+        {emailError && <p className="text-xs text-error mt-1.5">{t("fldEmailInvalid")}</p>}
       </div>
 
       <div>

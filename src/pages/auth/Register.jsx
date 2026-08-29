@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
@@ -104,6 +104,7 @@ function getStrength(passed) {
 export default function Register() {
   const { t, dir, locale } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
   const { register, login, refreshProfile } = useAuth();
 
   const passwordRef = useRef(null);
@@ -232,7 +233,18 @@ export default function Register() {
       }
 
       await refreshProfile();
-      navigate("/dashboard?welcome=1");
+
+      // Mirrors Login.jsx's own restore: a registration triggered by
+      // RequireAuth (e.g. the /claim/:token flow) carries the page the
+      // visitor was trying to reach - land them back there instead of
+      // always going to the dashboard, so the claim token isn't lost by
+      // choosing "create account" instead of "log in".
+      const from = location.state?.from;
+      if (from) {
+        navigate(from, { state: location.state?.fromState });
+      } else {
+        navigate("/dashboard?welcome=1");
+      }
     } catch (err) {
       const fallback = {
         ar: "تعذّر إنشاء الحساب. حاول مرة أخرى.",

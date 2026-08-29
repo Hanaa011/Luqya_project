@@ -118,7 +118,7 @@ export default function Login() {
 
       <p className="mt-8 text-center text-sm text-muted-foreground">
         {t("noAccount")}{" "}
-        <Link to="/auth/register" className="font-semibold text-primary hover:underline">
+        <Link to="/auth/register" state={location.state} className="font-semibold text-primary hover:underline">
           {t("createOne")}
         </Link>
       </p>

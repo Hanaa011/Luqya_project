@@ -1,21 +1,31 @@
 import { useEffect, useState } from "react";
-import { Bell, Sparkles, Loader2, BellOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bell, Sparkles, PhoneMissed, Loader2 } from "lucide-react";
 import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
-import { listNotifications, markNotificationAsRead } from "../api/notifications";
+import { listNotifications, listMyNotifications, markNotificationAsRead } from "../api/notifications";
 import { getKnownReporterId } from "../api/reporterIdentity";
+import { openConversation } from "../api/conversations";
 
 /**
- * NotificationAppService.GetListAsync(Guid reporterId, ...) — reporterId
- * is a real, non-nullable required parameter (verified in
- * LostFound.Application/Notifications/NotificationAppService.cs). There is
- * no "get my reporter" endpoint, so this only calls the API when a real
- * reporterId is already known (cached after this browser created a report
- * — see api/reporterIdentity.js). It never sends Guid.Empty or a guess.
+ * Two independent notification sources, merged here rather than on the
+ * backend (there is no single owner id that covers both — see
+ * Notification.cs's dual ReporterId/IdentityUserId keys):
+ *  - GetListAsync(reporterId, ...): reporter-keyed (e.g. match alerts).
+ *    Only callable when a real reporterId is already known (cached after
+ *    this browser created a report — see api/reporterIdentity.js). Never
+ *    sends Guid.Empty or a guess.
+ *  - GetMyListAsync(...): identity-keyed (currently: missed calls), scoped
+ *    server-side to CurrentUser.Id. Fetched whenever the user is logged
+ *    in, independent of whether a reporterId is known.
+ * Items from the identity-keyed source are tagged source:"identity" so a
+ * click can open the related conversation; reporter-keyed items keep the
+ * existing mark-as-read-only behavior.
  */
 export default function NotificationBell() {
   const { t } = useI18n();
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -24,16 +34,32 @@ export default function NotificationBell() {
   const reporterId = getKnownReporterId();
 
   useEffect(() => {
-    if (!open || loaded || !profile || !reporterId) return;
+    if (!open || loaded || !profile) return;
 
     let cancelled = false;
     Promise.resolve().then(() => {
       if (!cancelled) setLoading(true);
     });
 
-    listNotifications({ reporterId, maxResultCount: 20, sorting: "creationTime desc" })
-      .then((res) => !cancelled && setItems(res?.items ?? []))
-      .catch(() => !cancelled && setItems([]))
+    const requests = [
+      listMyNotifications({ maxResultCount: 20, sorting: "creationTime desc" })
+        .then((res) => (res?.items ?? []).map((n) => ({ ...n, source: "identity" })))
+        .catch(() => []),
+      reporterId
+        ? listNotifications({ reporterId, maxResultCount: 20, sorting: "creationTime desc" })
+            .then((res) => (res?.items ?? []).map((n) => ({ ...n, source: "reporter" })))
+            .catch(() => [])
+        : Promise.resolve([]),
+    ];
+
+    Promise.all(requests)
+      .then(([mine, byReporter]) => {
+        if (cancelled) return;
+        const merged = [...mine, ...byReporter].sort(
+          (a, b) => new Date(b.creationTime) - new Date(a.creationTime)
+        );
+        setItems(merged);
+      })
       .finally(() => {
         if (cancelled) return;
         setLoading(false);
@@ -48,10 +74,18 @@ export default function NotificationBell() {
   const unreadCount = items.filter((n) => !n.isRead).length;
 
   function handleOpenItem(item) {
-    if (item.isRead) return;
-    markNotificationAsRead(item.id)
-      .then(() => setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))))
-      .catch(() => {});
+    if (!item.isRead) {
+      markNotificationAsRead(item.id)
+        .then(() => setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))))
+        .catch(() => {});
+    }
+
+    if (item.source === "identity" && item.reportId) {
+      setOpen(false);
+      openConversation(item.reportId)
+        .then((conversation) => navigate(`/messages/${conversation.id}`))
+        .catch(() => {});
+    }
   }
 
   return (
@@ -82,11 +116,6 @@ export default function NotificationBell() {
 
             {!profile ? (
               <div className="px-5 py-8 text-center text-sm text-muted-foreground">{t("navLogin")}</div>
-            ) : !reporterId ? (
-              <div className="px-5 py-8 flex flex-col items-center gap-2 text-center text-sm text-muted-foreground">
-                <BellOff className="size-5" />
-                {t("notifUnavailable")}
-              </div>
             ) : loading ? (
               <div className="px-5 py-8 flex items-center justify-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
@@ -104,7 +133,11 @@ export default function NotificationBell() {
                     }`}
                   >
                     <span className="mt-0.5 size-8 rounded-xl grid place-items-center shrink-0 bg-primary/10 text-primary">
-                      <Sparkles className="size-4" />
+                      {item.source === "identity" ? (
+                        <PhoneMissed className="size-4" />
+                      ) : (
+                        <Sparkles className="size-4" />
+                      )}
                     </span>
 
                     <span className="flex-1 text-sm leading-snug">
