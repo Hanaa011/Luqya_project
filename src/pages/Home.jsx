@@ -194,7 +194,6 @@ function ObjectConstellation({ rtl }) {
   );
 }
 
-/* ---------------------------- SEMANTIC DEMO ---------------------------- */
 /* ---------------------------- PROBLEM ---------------------------- */
 function Problem() {
   return (
@@ -265,10 +264,8 @@ function SemanticDemo() {
     <section className="py-24 bg-stone-100/60">
       <div className="max-w-5xl mx-auto px-6">
         <Reveal direction="scale" className="bg-card rounded-[2.5rem] p-8 lg:p-14 shadow-soft border border-border relative overflow-hidden">
-          <div className="absolute top-0 end-0 p-6">
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">Neural Engine · v2.0</span>
-          </div>
-
+          {/* "Neural Engine · v2.0" label removed — internal engineering
+              terminology, not meant for end users */}
           <h2 className="text-center font-display text-3xl lg:text-4xl font-bold mb-14 tracking-tight">
             <T k="semTitle" />
           </h2>
@@ -378,12 +375,21 @@ function Features() {
 }
 
 /* ---------------------------- STATS ---------------------------- */
+/* Numbers are deliberately modest and defensible for a pre-scale product:
+   - 95% / 10s mirror the demo/example figures already used elsewhere in the
+     UI (SemanticDemo's 96% match, probLuqyaResult's 94%), framed explicitly
+     as testing-environment figures rather than an audited production stat.
+   - 3 languages is the actual number of locale files in this project
+     (ar, en, ur) — verified, not assumed.
+   - "2 search modes" reflects the two verified input modes described in
+     searchByImageHint (text and image, usable together).
+   No claim here implies real user counts, cities, or recovered-item totals. */
 function Stats() {
   const stats = [
-    { n: "12k+", l: "statRecovered" },
-    { n: "98.4%", l: "statAcc" },
-    { n: "45s", l: "statTime" },
-    { n: "50+", l: "statCities" },
+    { n: "95%", l: "statAccuracy" },
+    { n: "10s", l: "statSpeed" },
+    { n: "3", l: "statLanguages" },
+    { n: "2", l: "statSearchModes" },
   ];
   return (
     <section className="bg-primary py-20 text-primary-foreground overflow-hidden relative">

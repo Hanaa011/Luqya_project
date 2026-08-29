@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowRight,
+  ArrowUpRight,
   Loader2,
   AlertCircle,
   Send,
@@ -13,11 +13,15 @@ import {
   PackageCheck,
   Check,
   CheckCheck,
+  ShieldAlert,
+  ExternalLink,
+  MessageCircle,
 } from "lucide-react";
 
 import { useI18n } from "../lib/useI18n";
 import { useAuth } from "../lib/useAuth";
 import { getConversation, sendConversationMessage } from "../api/conversations";
+import { getReport } from "../api/reports";
 import { startCall, joinCall, endCall } from "../api/calls";
 import { useAgoraCall } from "../hooks/useAgoraCall";
 import { ReportType } from "../api/enums";
@@ -84,6 +88,7 @@ export default function Conversation() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [linkedReport, setLinkedReport] = useState(null);
   const bottomRef = useRef(null);
 
   const agoraCall = useAgoraCall();
@@ -138,6 +143,32 @@ export default function Conversation() {
       window.clearInterval(intervalId);
     };
   }, [id]);
+
+  // The safety handover warning is only for the person who actually created
+  // the FOUND report. reportType alone is not enough because both
+  // participants see the same conversation/report context.
+  useEffect(() => {
+    const reportId = conversation?.reportId;
+
+    if (!reportId) {
+      setLinkedReport(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    getReport(reportId)
+      .then((report) => {
+        if (!cancelled) setLinkedReport(report);
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedReport(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [conversation?.reportId]);
 
   // Auto-accept an incoming call when arriving here via the global
   // cross-page notification's Accept button (Task 6) - the call itself is
@@ -381,130 +412,349 @@ export default function Conversation() {
 
   const showCallCard = isIncomingCall || isInCallUi;
 
-  return (
-    <section className="py-10 lg:py-16">
-      <div className="max-w-2xl lg:max-w-5xl mx-auto px-6">
-        <Link
-          to="/messages"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors mb-6"
-        >
-          <ArrowRight className={`size-4 ${lang === "ar" || lang === "ur" ? "" : "rotate-180"}`} />
-          {copy(lang, { ar: "الرسائل", en: "Messages", ur: "پیغامات" })}
-        </Link>
+  const isFinderHoldingItem =
+    conversation?.reportType === ReportType.FOUND &&
+    Boolean(userId) &&
+    Boolean(linkedReport?.creatorId) &&
+    String(linkedReport.creatorId).toLowerCase() === String(userId).toLowerCase();
 
-        <div className="lg:flex lg:items-start lg:gap-5">
-          <div className="rounded-[2rem] border border-border bg-card shadow-soft overflow-hidden flex flex-col h-[70vh] lg:flex-1 lg:min-w-0">
-            {/* Report context header - "must clearly show which report/item
-                it belongs to". No phone/email anywhere on this page. */}
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-3 shrink-0">
-              <div className="min-w-0">
-                <p className="text-sm font-bold truncate">{conversation.otherParticipantName}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {conversation.reportType === ReportType.FOUND
-                    ? copy(lang, { ar: "بخصوص غرض موجود", en: "About a found item", ur: "ملنے والی چیز کے بارے میں" })
-                    : copy(lang, { ar: "بخصوص غرض مفقود", en: "About a lost item", ur: "کھوئی ہوئی چیز کے بارے میں" })}
-                  {conversation.reportDescription ? ` · ${conversation.reportDescription}` : ""}
-                </p>
+  return (
+    <section
+      dir={lang === "ar" || lang === "ur" ? "rtl" : "ltr"}
+      className="min-h-[calc(100vh-80px)] bg-background py-6 sm:py-8 lg:py-10"
+    >
+      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+        {/* Back navigation */}
+        <div className="mb-4">
+          <Link
+            to="/messages"
+            className="inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-stone-100 hover:text-foreground"
+          >
+            <ArrowUpRight
+              className={`size-3.5 ${
+                lang === "ar" || lang === "ur" ? "" : "-scale-x-100"
+              }`}
+              strokeWidth={1.7}
+            />
+            {copy(lang, {
+              ar: "العودة إلى الرسائل",
+              en: "Back to messages",
+              ur: "پیغامات پر واپس جائیں",
+            })}
+          </Link>
+        </div>
+
+        <div className={showCallCard ? "lg:flex lg:items-start lg:gap-5" : ""}>
+          {/* Conversation shell */}
+          <div
+            className={`
+              mx-auto flex w-full min-w-0 flex-col overflow-hidden
+              rounded-[1.75rem] border border-border bg-card shadow-soft
+              h-[calc(100vh-170px)] min-h-[34rem] max-h-[47rem]
+              ${showCallCard ? "lg:flex-1" : "max-w-4xl"}
+            `}
+          >
+            {/* Compact conversation header */}
+            <header className="shrink-0 border-b border-border bg-card px-4 py-3.5 sm:px-5">
+              <div className="flex items-center gap-3">
+                <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/10 font-mono text-sm font-extrabold text-primary">
+                  {conversation.otherParticipantName?.slice(0, 2).toUpperCase() || "?"}
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h1 className="truncate text-sm font-extrabold text-foreground sm:text-base">
+                      {conversation.otherParticipantName ||
+                        copy(lang, {
+                          ar: "مستخدم لُقيا",
+                          en: "Luqya user",
+                          ur: "لقیا صارف",
+                        })}
+                    </h1>
+
+                    <span
+                      className={`
+                        hidden shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold sm:inline-flex
+                        ${
+                          conversation.reportType === ReportType.FOUND
+                            ? "bg-success-tint text-success"
+                            : "bg-warn-tint text-warn"
+                        }
+                      `}
+                    >
+                      {conversation.reportType === ReportType.FOUND
+                        ? copy(lang, {
+                            ar: "بلاغ العثور",
+                            en: "Found report",
+                            ur: "ملنے کی رپورٹ",
+                          })
+                        : copy(lang, {
+                            ar: "بلاغ الفقد",
+                            en: "Lost report",
+                            ur: "گمشدگی کی رپورٹ",
+                          })}
+                    </span>
+                  </div>
+
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {conversation.reportDescription ||
+                      copy(lang, {
+                        ar: "محادثة مرتبطة ببلاغ في لُقيا",
+                        en: "Conversation linked to a Luqya report",
+                        ur: "لقیا کی رپورٹ سے منسلک گفتگو",
+                      })}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <Link
+                    to={`/match/${conversation.reportId}`}
+                    title={copy(lang, {
+                      ar: "عرض البلاغ",
+                      en: "View report",
+                      ur: "رپورٹ دیکھیں",
+                    })}
+                    className="hidden h-9 items-center gap-1.5 rounded-xl border border-border px-3 text-xs font-bold text-muted-foreground transition-colors hover:border-primary/25 hover:bg-primary/[0.035] hover:text-primary sm:inline-flex"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    {copy(lang, {
+                      ar: "عرض البلاغ",
+                      en: "View report",
+                      ur: "رپورٹ دیکھیں",
+                    })}
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={handleStartCall}
+                    disabled={
+                      callActionPending ||
+                      agoraCall.phase !== "idle" ||
+                      Boolean(activeCall)
+                    }
+                    title={copy(lang, {
+                      ar: "مكالمة صوتية",
+                      en: "Voice call",
+                      ur: "صوتی کال",
+                    })}
+                    className="
+                      grid size-9 shrink-0 place-items-center rounded-xl
+                      border border-border text-foreground/65
+                      transition-all
+                      hover:border-primary/30 hover:bg-primary/[0.04] hover:text-primary
+                      disabled:cursor-not-allowed disabled:opacity-40
+                    "
+                  >
+                    <Phone className="size-4" strokeWidth={1.8} />
+                  </button>
+                </div>
               </div>
 
-              <Link
-                to={`/match/${conversation.reportId}`}
-                className="text-xs font-semibold text-primary hover:underline shrink-0"
-              >
-                {copy(lang, { ar: "عرض البلاغ", en: "View report", ur: "رپورٹ دیکھیں" })}
-              </Link>
+              {/* Mobile report link */}
+              <div className="mt-3 flex items-center justify-between gap-3 sm:hidden">
+                <span
+                  className={`
+                    rounded-md px-2 py-0.5 text-[10px] font-bold
+                    ${
+                      conversation.reportType === ReportType.FOUND
+                        ? "bg-success-tint text-success"
+                        : "bg-warn-tint text-warn"
+                    }
+                  `}
+                >
+                  {conversation.reportType === ReportType.FOUND
+                    ? copy(lang, {
+                        ar: "بلاغ العثور",
+                        en: "Found report",
+                        ur: "ملنے کی رپورٹ",
+                      })
+                    : copy(lang, {
+                        ar: "بلاغ الفقد",
+                        en: "Lost report",
+                        ur: "گمشدگی کی رپورٹ",
+                      })}
+                </span>
 
-              {/* Phase 2: the same phone button from Phase 1, now wired to a
-                  real 1:1 voice call instead of a disabled placeholder. */}
-              <button
-                type="button"
-                onClick={handleStartCall}
-                disabled={callActionPending || agoraCall.phase !== "idle" || Boolean(activeCall)}
-                title={copy(lang, { ar: "مكالمة صوتية", en: "Voice call", ur: "صوتی کال" })}
-                className="size-9 rounded-full border border-border grid place-items-center text-foreground/70 hover:text-primary hover:border-primary/40 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Phone className="size-4" />
-              </button>
-            </div>
+                <Link
+                  to={`/match/${conversation.reportId}`}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-primary"
+                >
+                  <ExternalLink className="size-3" />
+                  {copy(lang, {
+                    ar: "عرض البلاغ",
+                    en: "View report",
+                    ur: "رپورٹ دیکھیں",
+                  })}
+                </Link>
+              </div>
+            </header>
 
             {!showCallCard && callNotice && (
-              <div className="px-6 py-2.5 bg-stone-50 border-b border-border text-xs font-semibold text-muted-foreground text-center shrink-0">
+              <div className="shrink-0 border-b border-border bg-stone-50 px-4 py-2.5 text-center text-xs font-semibold text-muted-foreground">
                 {callNotice}
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
+            {/* Safety guidance — only for the creator of a FOUND report */}
+            {isFinderHoldingItem && (
+              <div className="shrink-0 border-b border-amber-200/60 bg-amber-50/65 px-4 py-3 sm:px-5">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700">
+                  <ShieldAlert className="size-4" strokeWidth={1.9} />
+                </span>
+
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold text-amber-950">
+                    {copy(lang, {
+                      ar: "تنبيه أمان قبل تسليم الغرض",
+                      en: "Safety reminder before handing over an item",
+                      ur: "چیز حوالے کرنے سے پہلے حفاظتی یاددہانی",
+                    })}
+                  </p>
+
+                  <p className="mt-1 text-[11px] leading-5 text-amber-900/75 sm:text-xs">
+                    {copy(lang, {
+                      ar: "إذا كان الغرض بحوزتك، لا تكشف جميع العلامات المميزة أو التفاصيل الخاصة به. اطلب من الطرف الآخر وصف تفاصيل لا تظهر في البلاغ، وتأكد من تطابقها قبل التسليم.",
+                      en: "If you have the item, don't reveal all of its identifying or private details. Ask the other person to describe details that aren't shown in the report, and verify them before handing it over.",
+                      ur: "اگر چیز آپ کے پاس ہے تو اس کی تمام شناختی یا نجی تفصیلات ظاہر نہ کریں۔ دوسرے شخص سے وہ تفصیلات بیان کرنے کو کہیں جو رپورٹ میں نظر نہیں آتیں، اور چیز حوالے کرنے سے پہلے ان کی تصدیق کریں۔",
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+            )}
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto bg-stone-50/35 px-4 py-5 sm:px-6">
               {messages.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-10">
-                  {copy(lang, {
-                    ar: "لا رسائل بعد. ابدأ المحادثة!",
-                    en: "No messages yet. Say hello!",
-                    ur: "ابھی کوئی پیغام نہیں۔ بات چیت شروع کریں!",
-                  })}
-                </p>
+                <div className="flex h-full min-h-48 flex-col items-center justify-center px-6 text-center">
+                  <span className="grid size-12 place-items-center rounded-2xl bg-primary/[0.07] text-primary">
+                    <MessageCircle className="size-5" strokeWidth={1.7} />
+                  </span>
+
+                  <p className="mt-3 text-sm font-bold text-foreground">
+                    {copy(lang, {
+                      ar: "ابدأ المحادثة",
+                      en: "Start the conversation",
+                      ur: "گفتگو شروع کریں",
+                    })}
+                  </p>
+
+                  <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+                    {copy(lang, {
+                      ar: "تحدث مع الطرف الآخر بخصوص الغرض، واحتفظ بالتواصل داخل لُقيا حتى يتم التحقق والتسليم.",
+                      en: "Talk about the item here and keep communication inside Luqya until verification and handover are complete.",
+                      ur: "چیز کے بارے میں یہاں بات کریں اور تصدیق و حوالگی مکمل ہونے تک رابطہ لقیا کے اندر رکھیں۔",
+                    })}
+                  </p>
+                </div>
               ) : (
-                messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.isMine ? "justify-end" : "justify-start"}`}>
+                <div className="space-y-3">
+                  {messages.map((m) => (
                     <div
-                      className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
-                        m.isMine ? "bg-primary text-primary-foreground" : "bg-stone-100 text-foreground"
-                      }`}
+                      key={m.id}
+                      className={`flex ${m.isMine ? "justify-end" : "justify-start"}`}
                     >
-                      <p className="whitespace-pre-wrap break-words">{m.text}</p>
-                      <p
-                        className={`flex items-center justify-end gap-1 text-[10px] mt-1 ${
-                          m.isMine ? "text-primary-foreground/70" : "text-muted-foreground"
-                        }`}
+                      <div
+                        className={`
+                          max-w-[82%] px-4 py-2.5 text-sm shadow-[0_1px_2px_rgba(0,0,0,0.035)]
+                          sm:max-w-[68%]
+                          ${
+                            m.isMine
+                              ? "rounded-[1.2rem] rounded-ee-md bg-primary text-primary-foreground"
+                              : "rounded-[1.2rem] rounded-es-md border border-border bg-card text-foreground"
+                          }
+                        `}
                       >
-                        {formatTime(m.creationTime)}
-                        {/* Simple sent/read indicator - single check once
-                            sent, double check once the recipient has opened
-                            the conversation (see ConversationAppService.
-                            GetAsync's MarkMessagesReadFor). */}
-                        {m.isMine &&
-                          (m.isRead ? (
-                            <CheckCheck className="size-3" />
-                          ) : (
-                            <Check className="size-3" />
-                          ))}
-                      </p>
+                        <p className="whitespace-pre-wrap break-words leading-6">
+                          {m.text}
+                        </p>
+
+                        <div
+                          className={`
+                            mt-1.5 flex items-center justify-end gap-1 text-[10px]
+                            ${
+                              m.isMine
+                                ? "text-primary-foreground/65"
+                                : "text-muted-foreground"
+                            }
+                          `}
+                        >
+                          <span>{formatTime(m.creationTime)}</span>
+
+                          {m.isMine &&
+                            (m.isRead ? (
+                              <CheckCheck className="size-3" />
+                            ) : (
+                              <Check className="size-3" />
+                            ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
+
               <div ref={bottomRef} />
             </div>
 
-            <div className="border-t border-border p-4 shrink-0">
-            {conversation.reportIsClosed ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center py-2">
-                <PackageCheck className="size-4" />
-                {copy(lang, {
-                  ar: "هذا البلاغ مغلق. لا يمكن إرسال رسائل جديدة.",
-                  en: "This report is closed. New messages can't be sent.",
-                  ur: "یہ رپورٹ بند ہے۔ نئے پیغامات نہیں بھیجے جا سکتے۔",
-                })}
-              </div>
-            ) : (
-              <form onSubmit={handleSend} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder={copy(lang, { ar: "اكتب رسالة...", en: "Type a message...", ur: "پیغام لکھیں..." })}
-                  className="flex-1 px-4 py-3 rounded-2xl bg-stone-50 border border-stone-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all text-sm"
-                />
-                <button
-                  type="submit"
-                  disabled={!text.trim() || sending}
-                  className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-5 py-3 rounded-2xl font-semibold shadow-glow hover:-translate-y-0.5 transition-transform disabled:opacity-60 disabled:translate-y-0 text-sm shrink-0"
-                >
-                  {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                  {copy(lang, { ar: "إرسال", en: "Send", ur: "بھیجیں" })}
-                </button>
-              </form>
-            )}
-          </div>
+            {/* Composer */}
+            <footer className="shrink-0 border-t border-border bg-card p-3 sm:p-4">
+              {conversation.reportIsClosed ? (
+                <div className="flex items-center justify-center gap-2 rounded-xl bg-stone-50 px-4 py-3 text-sm text-muted-foreground">
+                  <PackageCheck className="size-4" />
+                  {copy(lang, {
+                    ar: "هذا البلاغ مغلق. لا يمكن إرسال رسائل جديدة.",
+                    en: "This report is closed. New messages can't be sent.",
+                    ur: "یہ رپورٹ بند ہے۔ نئے پیغامات نہیں بھیجے جا سکتے۔",
+                  })}
+                </div>
+              ) : (
+                <form onSubmit={handleSend} className="flex items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-center rounded-2xl border border-border bg-stone-50/80 transition-all focus-within:border-primary/35 focus-within:bg-card focus-within:ring-4 focus-within:ring-primary/[0.05]">
+                    <input
+                      type="text"
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      placeholder={copy(lang, {
+                        ar: "اكتب رسالة...",
+                        en: "Type a message...",
+                        ur: "پیغام لکھیں...",
+                      })}
+                      className="h-12 min-w-0 flex-1 bg-transparent px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={!text.trim() || sending}
+                    aria-label={copy(lang, {
+                      ar: "إرسال",
+                      en: "Send",
+                      ur: "بھیجیں",
+                    })}
+                    title={copy(lang, {
+                      ar: "إرسال",
+                      en: "Send",
+                      ur: "بھیجیں",
+                    })}
+                    className="
+                      grid size-12 shrink-0 place-items-center rounded-2xl
+                      bg-primary text-primary-foreground shadow-sm
+                      transition-all
+                      hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md
+                      disabled:pointer-events-none disabled:opacity-40 disabled:translate-y-0
+                    "
+                  >
+                    {sending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Send className="size-4" />
+                    )}
+                  </button>
+                </form>
+              )}
+            </footer>
           </div>
 
           {showCallCard && (
@@ -552,113 +802,314 @@ function CallCard({
   onEnd,
   onToggleMute,
 }) {
-  const tone = phase === "error" ? "error" : isTrulyConnected ? "success" : "primary";
-  const toneClasses = {
-    error: { ring: "ring-error/25", bg: "bg-error-tint/30", text: "text-error", avatarBg: "bg-error-tint" },
-    success: { ring: "ring-success/25", bg: "bg-success-tint/30", text: "text-success", avatarBg: "bg-success-tint" },
-    primary: { ring: "ring-primary/25", bg: "bg-primary/[0.06]", text: "text-primary", avatarBg: "bg-primary/10" },
-  }[tone];
+  const displayName =
+    otherParticipantName ||
+    copy(lang, {
+      ar: "مستخدم لُقيا",
+      en: "Luqya user",
+      ur: "لقیا صارف",
+    });
 
-  const statusText = isIncoming
-    ? copy(lang, {
-        ar: `مكالمة واردة من ${otherParticipantName}`,
-        en: `Incoming call from ${otherParticipantName}`,
-        ur: `${otherParticipantName} کی جانب سے کال آ رہی ہے`,
+  const initials = displayName.slice(0, 2).toUpperCase();
+
+  const state =
+    phase === "error"
+      ? "error"
+      : isTrulyConnected
+        ? "connected"
+        : isIncoming || isRingingOutgoing
+          ? "ringing"
+          : "connecting";
+
+  const stateStyle = {
+    error: {
+      dot: "bg-error",
+      iconWrap: "bg-error-tint text-error",
+      text: "text-error",
+    },
+    connected: {
+      dot: "bg-success",
+      iconWrap: "bg-success-tint text-success",
+      text: "text-success",
+    },
+    ringing: {
+      dot: "bg-primary",
+      iconWrap: "bg-primary/10 text-primary",
+      text: "text-primary",
+    },
+    connecting: {
+      dot: "bg-primary",
+      iconWrap: "bg-primary/10 text-primary",
+      text: "text-primary",
+    },
+  }[state];
+
+  const callLabel = copy(lang, {
+    ar: "مكالمة صوتية",
+    en: "Voice call",
+    ur: "وائس کال",
+  });
+
+  const statusText = phase === "error"
+    ? errorMessage ||
+      copy(lang, {
+        ar: "تعذّر الاتصال",
+        en: "Call failed",
+        ur: "کال ناکام ہو گئی",
       })
-    : phase === "error"
-      ? errorMessage || copy(lang, { ar: "تعذّرت المكالمة", en: "Call failed", ur: "کال ناکام ہو گئی" })
+    : isIncoming
+      ? copy(lang, {
+          ar: "مكالمة واردة",
+          en: "Incoming call",
+          ur: "آنے والی کال",
+        })
       : phase === "connecting"
-        ? copy(lang, { ar: "جارٍ الاتصال...", en: "Connecting...", ur: "رابطہ ہو رہا ہے..." })
+        ? copy(lang, {
+            ar: "جارٍ إنشاء الاتصال...",
+            en: "Connecting...",
+            ur: "رابطہ ہو رہا ہے...",
+          })
         : isRingingOutgoing
           ? copy(lang, {
-              ar: `جارٍ الاتصال بـ ${otherParticipantName}...`,
-              en: `Calling ${otherParticipantName}...`,
-              ur: `${otherParticipantName} کو کال کی جا رہی ہے...`,
+              ar: "بانتظار رد الطرف الآخر...",
+              en: "Waiting for an answer...",
+              ur: "جواب کا انتظار ہے...",
             })
-          : copy(lang, { ar: "متصل", en: "Connected", ur: "منسلک" });
+          : copy(lang, {
+              ar: "المكالمة متصلة",
+              en: "Call connected",
+              ur: "کال منسلک ہے",
+            });
 
   return (
-    <div
-      className={`fixed inset-x-4 top-20 z-40 lg:static lg:inset-auto lg:top-auto lg:z-auto lg:w-72 lg:shrink-0 rounded-[1.75rem] border border-border bg-card shadow-luxe ring-1 ${toneClasses.ring} p-5 animate-rise-in`}
+    <aside
+      aria-label={callLabel}
+      className="
+        fixed left-1/2 top-20 z-40
+        w-[calc(100%-2rem)] max-w-sm -translate-x-1/2
+        overflow-hidden rounded-[1.5rem]
+        border border-border/90 bg-card/95
+        shadow-luxe backdrop-blur-xl
+        animate-rise-in
+        lg:static lg:left-auto lg:top-auto lg:z-auto
+        lg:w-[18rem] lg:max-w-none lg:shrink-0 lg:translate-x-0
+      "
     >
-      <div className="flex flex-col items-center text-center gap-1">
+      {/* Compact identity header */}
+      <div className="flex items-center gap-3 px-4 pb-3 pt-4">
         <span
-          className={`grid size-16 place-items-center rounded-full font-bold font-mono text-lg ${toneClasses.avatarBg} ${toneClasses.text}`}
+          className="
+            grid size-11 shrink-0 place-items-center rounded-xl
+            bg-primary/[0.08] font-mono text-sm font-extrabold text-primary
+            ring-1 ring-primary/10
+          "
+          aria-hidden="true"
         >
-          {otherParticipantName?.slice(0, 2).toUpperCase() || "?"}
+          {initials}
         </span>
-        <p className="mt-2 text-sm font-bold truncate max-w-full">{otherParticipantName}</p>
-        <p className={`text-xs font-semibold ${toneClasses.text} flex items-center gap-1.5 justify-center`}>
-          {phase === "error" ? (
-            <AlertCircle className="size-3.5" />
-          ) : phase === "connecting" ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : isIncoming || isRingingOutgoing ? (
-            <PhoneIncoming className="size-3.5 animate-pulse" />
-          ) : (
-            <Phone className="size-3.5" />
-          )}
-          {statusText}
-        </p>
-        {isTrulyConnected && (
-          <p className="mt-1 text-lg font-mono font-bold tabular-nums text-foreground">
-            {formatDuration(elapsedSeconds)}
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-extrabold text-foreground">
+            {displayName}
           </p>
-        )}
+
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span
+              className={`size-1.5 shrink-0 rounded-full ${stateStyle.dot} ${
+                state === "ringing" || state === "connecting"
+                  ? "animate-pulse"
+                  : ""
+              }`}
+            />
+            <span className="text-[11px] font-medium text-muted-foreground">
+              {callLabel}
+            </span>
+          </div>
+        </div>
+
+        <span
+          className={`grid size-8 shrink-0 place-items-center rounded-xl ${stateStyle.iconWrap}`}
+          aria-hidden="true"
+        >
+          {phase === "error" ? (
+            <AlertCircle className="size-4" strokeWidth={1.8} />
+          ) : phase === "connecting" ? (
+            <Loader2 className="size-4 animate-spin" strokeWidth={1.8} />
+          ) : isIncoming || isRingingOutgoing ? (
+            <PhoneIncoming className="size-4" strokeWidth={1.8} />
+          ) : (
+            <Phone className="size-4" strokeWidth={1.8} />
+          )}
+        </span>
+      </div>
+
+      {/* Call status */}
+      <div className="border-y border-border/70 bg-stone-50/55 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className={`min-w-0 text-xs font-semibold ${stateStyle.text}`}>
+            {statusText}
+          </p>
+
+          {isTrulyConnected && (
+            <time
+              className="
+                shrink-0 font-mono text-sm font-bold tabular-nums
+                tracking-wide text-foreground
+              "
+              aria-label={copy(lang, {
+                ar: "مدة المكالمة",
+                en: "Call duration",
+                ur: "کال کا دورانیہ",
+              })}
+            >
+              {formatDuration(elapsedSeconds)}
+            </time>
+          )}
+        </div>
+
         {isTrulyConnected && isMuted && (
-          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-error-tint text-error px-2.5 py-0.5 text-[11px] font-bold">
-            <MicOff className="size-3" />
-            {copy(lang, { ar: "مكتوم", en: "Muted", ur: "خاموش" })}
-          </span>
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-error">
+            <MicOff className="size-3.5" strokeWidth={1.8} />
+            {copy(lang, {
+              ar: "الميكروفون مكتوم",
+              en: "Microphone muted",
+              ur: "مائیکروفون خاموش ہے",
+            })}
+          </div>
         )}
       </div>
 
-      <div className="mt-5 flex items-center justify-center gap-3">
+      {/* Controls */}
+      <div className="p-3.5">
         {isIncoming ? (
-          <>
+          <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
               onClick={onDecline}
-              title={copy(lang, { ar: "رفض", en: "Decline", ur: "مسترد کریں" })}
-              className="size-12 rounded-full bg-error-tint text-error grid place-items-center hover:opacity-80 transition-opacity"
+              disabled={callActionPending}
+              aria-label={copy(lang, {
+                ar: "رفض المكالمة",
+                en: "Decline call",
+                ur: "کال مسترد کریں",
+              })}
+              className="
+                inline-flex h-11 items-center justify-center gap-2 rounded-xl
+                border border-error/20 bg-card
+                px-3 text-xs font-bold text-error
+                transition-all
+                hover:border-error/35 hover:bg-error-tint/50
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/15
+                disabled:pointer-events-none disabled:opacity-50
+              "
             >
-              <PhoneOff className="size-5" />
+              <PhoneOff className="size-4" strokeWidth={1.8} />
+              {copy(lang, {
+                ar: "رفض",
+                en: "Decline",
+                ur: "مسترد",
+              })}
             </button>
+
             <button
               type="button"
               onClick={onAccept}
               disabled={callActionPending}
-              title={copy(lang, { ar: "قبول", en: "Accept", ur: "قبول کریں" })}
-              className="size-12 rounded-full bg-success-tint text-success grid place-items-center hover:opacity-80 transition-opacity disabled:opacity-50"
+              aria-label={copy(lang, {
+                ar: "قبول المكالمة",
+                en: "Accept call",
+                ur: "کال قبول کریں",
+              })}
+              className="
+                inline-flex h-11 items-center justify-center gap-2 rounded-xl
+                bg-primary px-3
+                text-xs font-bold text-primary-foreground
+                shadow-sm transition-all
+                hover:bg-primary/90 hover:shadow-md
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20
+                disabled:pointer-events-none disabled:opacity-50
+              "
             >
-              <Phone className="size-5" />
+              {callActionPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Phone className="size-4" strokeWidth={1.8} />
+              )}
+              {copy(lang, {
+                ar: "قبول",
+                en: "Accept",
+                ur: "قبول",
+              })}
             </button>
-          </>
+          </div>
         ) : (
-          <>
+          <div className="flex items-center gap-2.5">
             {phase === "connected" && (
               <button
                 type="button"
                 onClick={onToggleMute}
-                title={copy(lang, { ar: "كتم/إلغاء كتم", en: "Mute/unmute", ur: "خاموش/آواز" })}
-                className={`size-11 rounded-full border grid place-items-center transition-colors ${
-                  isMuted ? "border-error/40 bg-error-tint text-error" : "border-border hover:bg-stone-100"
-                }`}
+                aria-pressed={isMuted}
+                aria-label={copy(lang, {
+                  ar: isMuted ? "إلغاء كتم الميكروفون" : "كتم الميكروفون",
+                  en: isMuted ? "Unmute microphone" : "Mute microphone",
+                  ur: isMuted ? "مائیکروفون کی آواز بحال کریں" : "مائیکروفون خاموش کریں",
+                })}
+                className={`
+                  inline-flex h-11 flex-1 items-center justify-center gap-2
+                  rounded-xl border px-3 text-xs font-bold
+                  transition-all
+                  focus-visible:outline-none focus-visible:ring-2
+                  ${
+                    isMuted
+                      ? "border-error/20 bg-error-tint/50 text-error focus-visible:ring-error/15"
+                      : "border-border bg-card text-foreground/75 hover:border-primary/20 hover:bg-primary/[0.035] hover:text-primary focus-visible:ring-primary/15"
+                  }
+                `}
               >
-                {isMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+                {isMuted ? (
+                  <MicOff className="size-4" strokeWidth={1.8} />
+                ) : (
+                  <Mic className="size-4" strokeWidth={1.8} />
+                )}
+
+                {copy(lang, {
+                  ar: isMuted ? "إلغاء الكتم" : "كتم",
+                  en: isMuted ? "Unmute" : "Mute",
+                  ur: isMuted ? "آواز بحال" : "خاموش",
+                })}
               </button>
             )}
+
             <button
               type="button"
               onClick={onEnd}
-              title={copy(lang, { ar: "إنهاء المكالمة", en: "End call", ur: "کال ختم کریں" })}
-              className="size-11 rounded-full bg-error-tint text-error grid place-items-center hover:opacity-80 transition-opacity"
+              disabled={callActionPending}
+              aria-label={copy(lang, {
+                ar: "إنهاء المكالمة",
+                en: "End call",
+                ur: "کال ختم کریں",
+              })}
+              className={`
+                inline-flex h-11 items-center justify-center gap-2
+                rounded-xl border border-error/20 bg-error-tint/45
+                px-3 text-xs font-bold text-error
+                transition-all
+                hover:border-error/35 hover:bg-error-tint
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/15
+                disabled:pointer-events-none disabled:opacity-50
+                ${phase === "connected" ? "flex-1" : "w-full"}
+              `}
             >
-              <PhoneOff className="size-4" />
+              <PhoneOff className="size-4" strokeWidth={1.8} />
+              {copy(lang, {
+                ar: "إنهاء",
+                en: "End call",
+                ur: "ختم کریں",
+              })}
             </button>
-          </>
+          </div>
         )}
       </div>
-    </div>
+    </aside>
   );
 }
+

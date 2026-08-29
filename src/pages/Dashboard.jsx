@@ -146,25 +146,88 @@ export default function Dashboard() {
     () => reports.filter((report) => report.status === ReportStatus.CLOSED).slice(0, 4),
     [reports]
   );
+  // One accepted match becomes the report's "current match".
+  // Other pending matches for that same report are not deleted or rejected;
+  // they are paused as alternatives and remain reachable from the report.
+  const matchWorkflow = useMemo(() => {
+    const reportById = new Map(reports.map((report) => [report.id, report]));
+    const reportIdForMatch = (match) =>
+      myReportIds.has(match.lostReportId) ? match.lostReportId : match.foundReportId;
+
+    const acceptedByReport = new Map();
+
+    for (const match of matches) {
+      if (match.status !== MatchStatus.ACCEPTED) continue;
+
+      const reportId = reportIdForMatch(match);
+      if (!reportId) continue;
+
+      const existing = acceptedByReport.get(reportId);
+      const currentTime = new Date(match.creationTime ?? 0).getTime();
+      const existingTime = new Date(existing?.creationTime ?? 0).getTime();
+
+      if (!existing || currentTime > existingTime) {
+        acceptedByReport.set(reportId, match);
+      }
+    }
+
+    const actionablePending = [];
+    const alternativesByReport = new Map();
+
+    for (const match of matches) {
+      if (match.status !== MatchStatus.PENDING) continue;
+
+      const reportId = reportIdForMatch(match);
+      if (!reportId) continue;
+
+      const report = reportById.get(reportId);
+
+      // A closed report is complete and should never ask for another decision.
+      if (report?.status === ReportStatus.CLOSED) continue;
+
+      if (acceptedByReport.has(reportId)) {
+        const alternatives = alternativesByReport.get(reportId) ?? [];
+        alternatives.push(match);
+        alternativesByReport.set(reportId, alternatives);
+      } else {
+        actionablePending.push(match);
+      }
+    }
+
+    return {
+      acceptedByReport,
+      alternativesByReport,
+      actionablePending,
+    };
+  }, [matches, myReportIds, reports]);
+
   const pendingMatches = useMemo(
-    () => matches.filter((match) => match.status === MatchStatus.PENDING).slice(0, 6),
-    [matches]
+    () => matchWorkflow.actionablePending.slice(0, 6),
+    [matchWorkflow]
   );
+
   const decidedMatches = useMemo(
     () => matches.filter((match) => match.status !== MatchStatus.PENDING).slice(0, 6),
     [matches]
   );
+
   const visiblePendingMatches = showAllPending ? pendingMatches : pendingMatches.slice(0, 2);
   const hiddenPendingCount = Math.max(0, pendingMatches.length - 2);
+
+  function alternativeCountForMatch(match) {
+    if (match.status !== MatchStatus.ACCEPTED) return 0;
+    const reportId = myReportIdInMatch(match);
+    return matchWorkflow.alternativesByReport.get(reportId)?.length ?? 0;
+  }
 
   const counts = useMemo(
     () => ({
       total: reports.length,
       active: reports.filter((report) => report.status !== ReportStatus.CLOSED).length,
-      attention: matches.filter((match) => match.status === MatchStatus.PENDING).length,
+      attention: matchWorkflow.actionablePending.length,
       resolved: reports.filter((report) => report.status === ReportStatus.CLOSED).length,
     }),
-    [matches, reports]
+    [matchWorkflow, reports]
   );
 
 
@@ -186,6 +249,11 @@ export default function Dashboard() {
   // the Contact link) incorrectly false.
   function myReportIdInMatch(match) {
     return myReportIds.has(match.lostReportId) ? match.lostReportId : match.foundReportId;
+  }
+
+  function myReportInMatch(match) {
+    const reportId = myReportIdInMatch(match);
+    return reports.find((report) => report.id === reportId) ?? null;
   }
 
   return (
@@ -251,6 +319,7 @@ export default function Dashboard() {
                       <PendingMatchCard
                         key={match.id}
                         match={match}
+                        report={myReportInMatch(match)}
                         href={`/match/${otherReportId(match)}?from=${myReportIdInMatch(match)}`}
                         lang={lang}
                         t={t}
@@ -281,9 +350,9 @@ export default function Dashboard() {
                 <EmptyState
                   title={copy(lang, { ar: "لا يوجد شيء يحتاج قرارك الآن", en: "You're all caught up", ur: "فی الحال کوئی فیصلہ باقی نہیں" })}
                   text={copy(lang, {
-                    ar: "أي مطابقة سابقة ستظل ظاهرة في قسم المطابقات الأخيرة أدناه.",
-                    en: "Any previous match still remains visible in Recent Matches below.",
-                    ur: "پچھلے میچز نیچے Recent Matches میں نظر آتے رہیں گے۔",
+                    ar: "إذا اخترت مطابقة لبلاغ، تُحفظ بقية المطابقات كبدائل ويمكنك الرجوع إليها من البلاغ نفسه.",
+                    en: "Once you choose a match for a report, the remaining candidates are kept as alternatives and stay available from that report.",
+                    ur: "کسی رپورٹ کے لیے میچ منتخب کرنے کے بعد باقی میچ متبادل کے طور پر محفوظ رہتے ہیں اور رپورٹ سے دوبارہ دیکھے جا سکتے ہیں۔",
                   })}
                 />
               )}
@@ -329,7 +398,10 @@ export default function Dashboard() {
                     <DecisionMatchRow
                       key={match.id}
                       match={match}
+                      report={myReportInMatch(match)}
                       href={`/match/${otherReportId(match)}?from=${myReportIdInMatch(match)}`}
+                      alternativesHref={`/match/${myReportIdInMatch(match)}?alternatives=1`}
+                      alternativeCount={alternativeCountForMatch(match)}
                       lang={lang}
                       t={t}
                       last={index === decidedMatches.length - 1}
@@ -507,11 +579,20 @@ function ArchivedReportCard({ report, lang, t }) {
   );
 }
 
-function PendingMatchCard({ match, href, lang, t }) {
+function PendingMatchCard({ match, report, href, lang, t }) {
   const score =
     match.similarityScore != null
       ? Math.round(Number(match.similarityScore))
       : null;
+
+  const isLost = report?.type === ReportType.LOST;
+  const reportTitle = report
+    ? reportSummary(report, t("browseTitle"))
+    : copy(lang, {
+        ar: "بلاغ من بلاغاتك",
+        en: "One of your reports",
+        ur: "آپ کی رپورٹس میں سے ایک",
+      });
 
   return (
     <Link
@@ -521,21 +602,53 @@ function PendingMatchCard({ match, href, lang, t }) {
       <span className="absolute inset-y-0 start-0 w-1 bg-warn/75" />
 
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <span className="inline-flex rounded-full bg-warn-tint px-2.5 py-1 text-[10px] font-bold text-warn">
             {t(matchStatusLabelKey(match.status))}
           </span>
 
-          <p className="mt-3 text-sm font-semibold sm:text-[15px]">
+          <p className="mt-3 text-[11px] font-bold text-muted-foreground">
             {copy(lang, {
-              ar: "مطابقة محتملة تحتاج قرارك",
-              en: "Potential match needs your decision",
-              ur: "ممکنہ میچ آپ کے فیصلے کا منتظر ہے",
+              ar: "مطابقة محتملة تخص بلاغك",
+              en: "Potential match for your report",
+              ur: "آپ کی رپورٹ کے لیے ممکنہ میچ",
             })}
           </p>
 
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            {formatDate(match.creationTime, lang)}
+          <p className="mt-1 line-clamp-2 text-sm font-extrabold leading-relaxed text-foreground sm:text-[15px]">
+            {reportTitle}
+          </p>
+
+          {report && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+              <span
+                className={`inline-flex rounded-full px-2 py-0.5 font-bold ${
+                  isLost
+                    ? "bg-warn-tint text-warn"
+                    : "bg-success-tint text-success"
+                }`}
+              >
+                {isLost ? t("lost") : t("found")}
+              </span>
+
+              <span className="text-muted-foreground">
+                {copy(lang, {
+                  ar: "تاريخ البلاغ",
+                  en: "Report date",
+                  ur: "رپورٹ کی تاریخ",
+                })}
+                {" · "}
+                {formatDate(report.creationTime, lang)}
+              </span>
+            </div>
+          )}
+
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {copy(lang, {
+              ar: "اضغط لمراجعة تفاصيل المطابقة",
+              en: "Open to review match details",
+              ur: "میچ کی تفصیلات دیکھنے کے لیے کھولیں",
+            })}
           </p>
         </div>
 
@@ -554,7 +667,16 @@ function PendingMatchCard({ match, href, lang, t }) {
   );
 }
 
-function DecisionMatchRow({ match, href, lang, t, last = false }) {
+function DecisionMatchRow({
+  match,
+  report,
+  href,
+  alternativesHref,
+  alternativeCount = 0,
+  lang,
+  t,
+  last = false,
+}) {
   const score =
     match.similarityScore != null
       ? Math.round(Number(match.similarityScore))
@@ -565,10 +687,20 @@ function DecisionMatchRow({ match, href, lang, t, last = false }) {
     ? "bg-success-tint text-success"
     : "bg-error-tint text-error";
 
+  const isLost = report?.type === ReportType.LOST;
+  const reportTitle = report
+    ? reportSummary(report, t("browseTitle"))
+    : copy(lang, {
+        ar: "بلاغ من بلاغاتك",
+        en: "One of your reports",
+        ur: "آپ کی رپورٹس میں سے ایک",
+      });
+
+  const hasAlternatives = accepted && alternativeCount > 0;
+
   return (
-    <Link
-      to={href}
-      className={`group flex min-h-[70px] items-center gap-4 px-1 py-3.5 transition-colors hover:bg-primary/[0.02] sm:px-3 ${
+    <div
+      className={`group flex min-h-[88px] items-center gap-4 px-1 py-3.5 transition-colors hover:bg-primary/[0.02] sm:px-3 ${
         last ? "" : "border-b border-border"
       }`}
     >
@@ -578,13 +710,13 @@ function DecisionMatchRow({ match, href, lang, t, last = false }) {
         }`}
       />
 
-      <div className="min-w-0 flex-1">
+      <Link to={href} className="min-w-0 flex-1 focus-visible:outline-none">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold">
             {copy(lang, {
-              ar: accepted ? "مطابقة تم قبولها" : "مطابقة تم رفضها",
-              en: accepted ? "Accepted match" : "Rejected match",
-              ur: accepted ? "منظور شدہ میچ" : "مسترد شدہ میچ",
+              ar: accepted ? "المطابقة الحالية" : "مطابقة تم رفضها",
+              en: accepted ? "Current match" : "Rejected match",
+              ur: accepted ? "موجودہ میچ" : "مسترد شدہ میچ",
             })}
           </p>
 
@@ -593,17 +725,65 @@ function DecisionMatchRow({ match, href, lang, t, last = false }) {
           </span>
         </div>
 
-        <p className="mt-1 text-xs text-muted-foreground">
+        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-[10px] font-bold text-muted-foreground">
+            {copy(lang, {
+              ar: "يخص بلاغك:",
+              en: "For your report:",
+              ur: "آپ کی رپورٹ:",
+            })}
+          </span>
+
+          {report && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                isLost
+                  ? "bg-warn-tint text-warn"
+                  : "bg-success-tint text-success"
+              }`}
+            >
+              {isLost ? t("lost") : t("found")}
+            </span>
+          )}
+
+          <span className="min-w-0 max-w-full truncate text-xs font-semibold text-foreground/80">
+            {reportTitle}
+          </span>
+        </div>
+
+        <p className="mt-1 text-[11px] text-muted-foreground">
           {formatDate(match.creationTime, lang)}
         </p>
-      </div>
+      </Link>
 
-      {score != null && (
-        <p className="shrink-0 font-display text-lg font-bold text-primary sm:text-xl">
-          {score}%
-        </p>
-      )}
-    </Link>
+      <div className="flex shrink-0 items-center gap-3">
+        {hasAlternatives && (
+          <Link
+            to={alternativesHref}
+            className="
+              inline-flex min-h-9 items-center rounded-full
+              border border-border bg-card px-3
+              text-[11px] font-bold text-primary
+              transition-all
+              hover:border-primary/25 hover:bg-primary/[0.04]
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15
+            "
+          >
+            {copy(lang, {
+              ar: `عرض البدائل (${alternativeCount})`,
+              en: `Alternatives (${alternativeCount})`,
+              ur: `متبادل (${alternativeCount})`,
+            })}
+          </Link>
+        )}
+
+        {score != null && (
+          <p className="font-display text-lg font-bold text-primary sm:text-xl">
+            {score}%
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 

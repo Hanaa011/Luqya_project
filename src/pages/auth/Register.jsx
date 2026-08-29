@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   ArrowRight,
+  ArrowUpRight,
   Check,
   Eye,
   EyeOff,
@@ -14,7 +15,11 @@ import { useI18n } from "../../lib/useI18n";
 import { useAuth } from "../../lib/useAuth";
 import { updateMyProfile } from "../../api/auth";
 import { ApiError } from "../../api/httpClient";
-import { isValidSaudiMobile, normalizeSaudiMobile } from "../../lib/saudiPhone";
+import {
+  isValidSaudiMobile,
+  normalizeSaudiMobile,
+  normalizeSaudiPhoneInput,
+} from "../../lib/saudiPhone";
 
 const PASSWORD_RULES = [
   { key: "length", test: (value) => value.length >= 8 },
@@ -23,6 +28,10 @@ const PASSWORD_RULES = [
   { key: "number", test: (value) => /[0-9]/.test(value) },
   { key: "special", test: (value) => /[^A-Za-z0-9\s]/.test(value) },
 ];
+
+function uiCopy(locale, values) {
+  return values[locale] ?? values.en;
+}
 
 const COPY = {
   ar: {
@@ -272,6 +281,43 @@ export default function Register() {
       title={t("registerTitle")}
       subtitle={t("registerSub")}
     >
+      {/* Minimal return link, aligned with the auth page chrome rather than the form. */}
+      <Link
+        to="/"
+        aria-label={uiCopy(locale, {
+          ar: "العودة إلى الرئيسية",
+          en: "Back to home",
+          ur: "ہوم پر واپس جائیں",
+        })}
+        className="
+          absolute right-6 top-5 z-20
+          inline-flex items-center gap-1.5
+          text-[11px] font-semibold tracking-[0.01em]
+          text-muted-foreground/60
+          transition-colors duration-200
+          hover:text-primary
+          focus-visible:outline-none
+          focus-visible:text-primary
+          focus-visible:underline
+          sm:right-8 sm:top-7
+          lg:right-10 lg:top-8
+        "
+      >
+        <span>
+          {uiCopy(locale, {
+            ar: "الرئيسية",
+            en: "Home",
+            ur: "ہوم",
+          })}
+        </span>
+
+        <ArrowUpRight
+          className="size-3"
+          strokeWidth={1.6}
+          aria-hidden="true"
+        />
+      </Link>
+
       {error && (
         <div
           role="alert"
@@ -321,13 +367,14 @@ export default function Register() {
         <div>
           <input
             type="tel"
+            inputMode="tel"
             name="tel"
             autoComplete="tel"
             required
             dir="ltr"
             value={form.phone}
             onChange={(e) => {
-              update("phone", e.target.value);
+              update("phone", normalizeSaudiPhoneInput(e.target.value));
               setPhoneError(false);
             }}
             placeholder="05XXXXXXXX"

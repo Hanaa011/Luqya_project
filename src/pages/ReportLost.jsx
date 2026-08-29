@@ -25,7 +25,11 @@ import { aiSearch, imageFileToBase64 } from "../api/search";
 import { reportHeadingTitle } from "../lib/reportTitle";
 import { ReportType, PreferredContactType } from "../api/enums";
 import { ApiError } from "../api/httpClient";
-import { isValidSaudiMobile } from "../lib/saudiPhone";
+import {
+  isValidSaudiMobile,
+  normalizeSaudiMobile,
+  normalizeSaudiPhoneInput,
+} from "../lib/saudiPhone";
 import { isValidEmail } from "../lib/email";
 import { setKnownReporterId } from "../api/reporterIdentity";
 import { fetchMyReports } from "../lib/myReports";
@@ -153,7 +157,10 @@ export default function ReportLost() {
   }
 
   function updateGuest(field, value) {
-    setGuest((g) => ({ ...g, [field]: value }));
+    const nextValue =
+      field === "reporterPhone" ? normalizeSaudiPhoneInput(value) : value;
+
+    setGuest((g) => ({ ...g, [field]: nextValue }));
     if (field === "reporterPhone") setPhoneError(false);
     if (field === "reporterEmail") setEmailError(false);
   }
@@ -230,8 +237,20 @@ export default function ReportLost() {
         imagePath,
         isItemWithFinder: false,
         ...buildReporterFields({
-          profile: profile && !profileHasPhone ? { ...profile, phoneNumber: profilePhone } : profile,
-          guest,
+          profile: profile
+            ? {
+                ...profile,
+                phoneNumber: normalizeSaudiMobile(
+                  profileHasPhone ? profile.phoneNumber : profilePhone
+                ),
+              }
+            : profile,
+          guest: !profile
+            ? {
+                ...guest,
+                reporterPhone: normalizeSaudiMobile(guest.reporterPhone),
+              }
+            : guest,
         }),
       });
 

@@ -20,7 +20,11 @@ import { listLocations, createLocation } from "../api/locations";
 import { imageFileToBase64 } from "../api/search";
 import { ReportType, PreferredContactType } from "../api/enums";
 import { ApiError } from "../api/httpClient";
-import { isValidSaudiMobile } from "../lib/saudiPhone";
+import {
+  isValidSaudiMobile,
+  normalizeSaudiMobile,
+  normalizeSaudiPhoneInput,
+} from "../lib/saudiPhone";
 import { isValidEmail } from "../lib/email";
 import { setKnownReporterId } from "../api/reporterIdentity";
 import { buildReporterFields } from "../lib/reporterFields";
@@ -123,7 +127,10 @@ export default function ReportFound() {
   }
 
   function updateGuest(field, value) {
-    setGuest((g) => ({ ...g, [field]: value }));
+    const nextValue =
+      field === "reporterPhone" ? normalizeSaudiPhoneInput(value) : value;
+
+    setGuest((g) => ({ ...g, [field]: nextValue }));
     if (field === "reporterPhone") setPhoneError(false);
     if (field === "reporterEmail") setEmailError(false);
   }
@@ -192,8 +199,20 @@ export default function ReportFound() {
         isItemWithFinder: true,
         pickupLocation: locationText,
         ...buildReporterFields({
-          profile: profile && !profileHasPhone ? { ...profile, phoneNumber: profilePhone } : profile,
-          guest,
+          profile: profile
+            ? {
+                ...profile,
+                phoneNumber: normalizeSaudiMobile(
+                  profileHasPhone ? profile.phoneNumber : profilePhone
+                ),
+              }
+            : profile,
+          guest: !profile
+            ? {
+                ...guest,
+                reporterPhone: normalizeSaudiMobile(guest.reporterPhone),
+              }
+            : guest,
         }),
       });
 
@@ -361,10 +380,11 @@ export default function ReportFound() {
                   <Field label={t("fldMobile")}>
                     <input
                       type="tel"
+                      inputMode="tel"
                       dir="ltr"
                       value={profilePhone}
                       onChange={(e) => {
-                        setProfilePhone(e.target.value);
+                        setProfilePhone(normalizeSaudiPhoneInput(e.target.value));
                         setProfilePhoneError(false);
                       }}
                       placeholder={t("fldMobilePh")}
