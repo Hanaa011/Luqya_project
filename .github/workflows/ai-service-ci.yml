@@ -1,0 +1,214 @@
+name: AI Service CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "ai_service/**"
+      - ".github/workflows/ai-service-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # 1. Checkout
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Build Docker image
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t luqya-ai:latest \
+            -f ai_service/Dockerfile \
+            ai_service
+
+      # 3. Save image to a file
+      - name: Save Docker Image
+        run: |
+          docker save luqya-ai:latest -o luqya-ai.tar
+
+      # 4. Copy image to server
+      - name: Copy Image to Server
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "./luqya-ai.tar"
+          target: "/opt/projects/Leap"
+          overwrite: true
+          timeout: 120s
+          command_timeout: 10m
+
+      # 5. Deploy on server
+      - name: Deploy on Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+          script: |
+            set -e
+
+            cd /opt/projects/Leap
+
+            echo "========================================"
+            echo "Checking prerequisites..."
+            echo "========================================"
+
+            # ai_service needs its own env file (OPENAI_API_KEY,
+            # BACKEND_API_URL, BACKEND_API_TOKEN, ALLOWED_ORIGINS) - same
+            # pattern as luqya-api.env, but this file is not created by CI.
+            # It must exist on the server before this workflow can succeed;
+            # this step stops with a clear message instead of letting
+            # `docker run --env-file` fail with a cryptic error.
+            if [ ! -f /opt/projects/Leap/luqya-ai.env ]; then
+              echo "ERROR: /opt/projects/Leap/luqya-ai.env is missing."
+              echo "DevOps action required: create this file on the server with:"
+              echo "  OPENAI_API_KEY=<the real key>"
+              echo "  BACKEND_API_URL=http://luqya-api:80"
+              echo "  BACKEND_API_TOKEN=<optional, only if the backend requires it>"
+              echo "  ALLOWED_ORIGINS=https://luqya.hlolk.com"
+              echo "Then re-run this workflow."
+              exit 1
+            fi
+
+            echo "========================================"
+            echo "Ensuring shared internal network exists..."
+            echo "========================================"
+
+            # ai_service is never exposed publicly - it's only reachable
+            # from luqya-api over this internal, user-defined bridge
+            # network (Docker's default bridge has no container-name DNS).
+            docker network create luqya-internal 2>/dev/null || true
+
+            echo "========================================"
+            echo "Loading new Docker image..."
+            echo "========================================"
+
+            docker load -i luqya-ai.tar
+
+            echo "========================================"
+            echo "Saving current image as previous..."
+            echo "========================================"
+
+            if docker inspect luqya-ai >/dev/null 2>&1; then
+
+              CURRENT_IMAGE=$(docker inspect luqya-ai --format '{{.Image}}')
+
+              if docker image inspect "$CURRENT_IMAGE" >/dev/null 2>&1; then
+                docker tag "$CURRENT_IMAGE" luqya-ai:previous
+                echo "Previous image saved: $CURRENT_IMAGE"
+              fi
+
+            fi
+
+            echo "========================================"
+            echo "Stopping old container..."
+            echo "========================================"
+
+            docker stop luqya-ai || true
+
+            echo "========================================"
+            echo "Removing old container..."
+            echo "========================================"
+
+            docker rm luqya-ai || true
+
+            echo "========================================"
+            echo "Starting new container..."
+            echo "========================================"
+
+            # No -p (host port publish) - deliberately internal-only,
+            # reachable as http://luqya-ai:8000 from any container on the
+            # luqya-internal network, never from the public internet.
+            docker run -d \
+              --name luqya-ai \
+              --restart unless-stopped \
+              --network luqya-internal \
+              --env-file /opt/projects/Leap/luqya-ai.env \
+              luqya-ai:latest
+
+            echo "========================================"
+            echo "Waiting for container to start..."
+            echo "========================================"
+
+            sleep 10
+
+            echo "========================================"
+            echo "Checking container status..."
+            echo "========================================"
+
+            if [ "$(docker inspect -f '{{.State.Running}}' luqya-ai 2>/dev/null)" != "true" ]; then
+
+              echo "ERROR: New container is not running!"
+
+              echo "Container logs:"
+              docker logs --tail 100 luqya-ai
+
+              echo "Attempting rollback..."
+
+              docker rm -f luqya-ai || true
+
+              if docker image inspect luqya-ai:previous >/dev/null 2>&1; then
+
+                docker run -d \
+                  --name luqya-ai \
+                  --restart unless-stopped \
+                  --network luqya-internal \
+                  --env-file /opt/projects/Leap/luqya-ai.env \
+                  luqya-ai:previous
+
+                echo "Rollback completed."
+
+              else
+
+                echo "ERROR: Previous image not found."
+                exit 1
+
+              fi
+
+              exit 1
+
+            fi
+
+            echo "Container is running successfully."
+
+            echo "========================================"
+            echo "Container status"
+            echo "========================================"
+
+            docker ps --filter "name=luqya-ai"
+
+            echo "========================================"
+            echo "Checking container environment..."
+            echo "========================================"
+
+            docker exec luqya-ai sh -c \
+              'printenv | grep -E "^BACKEND_API_URL|^ALLOWED_ORIGINS" ; printenv | grep -q "^OPENAI_API_KEY=" && echo "OPENAI_API_KEY=SET"'
+
+            echo "========================================"
+            echo "Reminder: luqya-api must join luqya-internal too"
+            echo "========================================"
+
+            echo "One-time step (not run automatically by this workflow -"
+            echo "backend-ci.yml was intentionally left untouched):"
+            echo "  docker network connect luqya-internal luqya-api"
+            echo "And add to luqya-api.env: LostFound__AiService__BaseUrl=http://luqya-ai:8000"
+            echo "Then restart luqya-api."
+
+            echo "========================================"
+            echo "Checking container logs..."
+            echo "========================================"
+
+            docker logs --tail 50 luqya-ai
+
+            echo "========================================"
+            echo "Deployment completed successfully!"
+            echo "========================================"
