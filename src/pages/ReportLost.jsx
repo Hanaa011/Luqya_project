@@ -264,12 +264,45 @@ export default function ReportLost() {
       // aiSearch() now returns AiSearchResponseDto (results nested under
       // `.results` alongside conversational fields this page doesn't use) —
       // everything below still operates on a plain array exactly as before.
-      let results = (await aiSearch({
+      const firstResponse = await aiSearch({
         text: description,
         imageBase64,
         type: ReportType.FOUND,
         maxResults: 6,
-      })).results ?? [];
+        context: { location: locationText },
+      });
+
+      let results = firstResponse.results ?? [];
+
+      // The form is one-shot - it has no follow-up turn to let the user
+      // answer "I don't know the color" the way chat does. When that's
+      // the ONLY thing blocking a search (type and location both already
+      // known), reuse ai_service's own existing "user disclaimed a
+      // missing detail" rule once, automatically, instead of surfacing a
+      // dead end. Narrow on purpose: never retries for a missing type,
+      // a missing location, or a genuine error - only this one specific,
+      // already-supported gate, and never more than once.
+      if (
+        firstResponse.shouldMatch === false &&
+        firstResponse.extractedType &&
+        firstResponse.extractedLocation &&
+        !firstResponse.extractedColor
+      ) {
+        const retryResponse = await aiSearch({
+          text: "لا أعرف اللون",
+          type: ReportType.FOUND,
+          maxResults: 6,
+          context: {
+            type: firstResponse.extractedType,
+            description: firstResponse.extractedDescription,
+            location: firstResponse.extractedLocation,
+            reportKind: firstResponse.reportKind,
+            itemNameLocal: firstResponse.itemNameLocal,
+          },
+        });
+
+        results = retryResponse.results ?? [];
+      }
 
       // Exclude the user's own reports from recovery candidates — only
       // when ownership can be verified via the real Report.CreatorId
